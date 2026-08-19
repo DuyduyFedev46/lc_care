@@ -1,0 +1,23 @@
+{
+  "projects": {},
+  "targets": {
+    "chauthuc": {
+      "hosting": {
+        "jp": [
+          "chauthuc-jp"
+        ],
+        "vi": [
+          "chauthuc-5cae1"
+        ]
+      }
+    },
+    "keolai-63ec1": {
+      "hosting": {
+        "vi": [
+          "chauthuc"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

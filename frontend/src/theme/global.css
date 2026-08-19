@@ -1,0 +1,423 @@
+/* ─────────────────────────────────────────────
+   LC Care — Global CSS (global.css)
+   Reset + all keyframes (consolidated from
+   main.jsx, App.jsx ANIM_CSS, GardenScreen
+   inline <style> blocks) + utility classes
+   ───────────────────────────────────────────── */
+
+/* ══════════════════════════════════════
+   RESET
+   ══════════════════════════════════════ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  font-family: var(--font-body);
+  font-size: clamp(14px, 3.6vw, 16px);   /* responsive base — min 14px elderly */
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:lang(ja) {
+  font-family: 'Noto Sans JP', 'Be Vietnam Pro', sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  height: 100vh;
+  height: 100dvh;
+  position: relative;
+  box-shadow: 0 0 40px rgba(0, 17, 45, 0.08);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ══════════════════════════════════════
+   SAFE AREA HELPERS
+   ══════════════════════════════════════ */
+.safe-top    { padding-top:    var(--sat, 0px); }
+.safe-bottom { padding-bottom: var(--sab, 0px); }
+
+/* ══════════════════════════════════════
+   FOCUS VISIBLE RING — Accessibility
+   ══════════════════════════════════════ */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ══════════════════════════════════════
+   SCREEN BACKGROUND — driven by data-screen
+   attr set on AppRouter wrapper div
+   ══════════════════════════════════════ */
+[data-screen="home"] {
+  background: var(--garden-warm-bg);
+}
+[data-screen="water-action"] {
+  background: linear-gradient(160deg, #083D1A 0%, #0D2A16 100%);
+}
+[data-screen="germination"] {
+  background: linear-gradient(160deg, #0D2A18 0%, #0A1F10 100%);
+}
+[data-screen="level-up"] {
+  background: var(--dark-bg-garden);
+}
+
+/* ══════════════════════════════════════
+   GLASS UTILITY CLASSES
+   ══════════════════════════════════════ */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-dark {
+  background: var(--glass-dark-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-dark-border);
+}
+
+.glass-clinic {
+  background: var(--glass-clinic-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-clinic-border);
+}
+
+/* ══════════════════════════════════════
+   CARD UTILITY
+   ══════════════════════════════════════ */
+.card {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--elev-1);
+}
+
+/* ══════════════════════════════════════
+   ELEVATION UTILITIES
+   ══════════════════════════════════════ */
+.elev-1 { box-shadow: var(--elev-1); }
+.elev-2 { box-shadow: var(--elev-2); }
+.elev-3 { box-shadow: var(--elev-3); }
+
+/* ══════════════════════════════════════
+   MOTION SAFETY WRAPPER
+   All animations inside .motion-safe only
+   play when user hasn't opted-out of motion
+   ══════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ══════════════════════════════════════
+   TYPOGRAPHY UTILITIES
+   ══════════════════════════════════════ */
+.u-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ══════════════════════════════════════
+   SCROLLBAR RESET (mobile invisible)
+   ══════════════════════════════════════ */
+.scroll-hidden {
+  scrollbar-width: none;
+}
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* ══════════════════════════════════════
+   KEYFRAMES — CONSOLIDATED
+   All keyframes from:
+     • main.jsx (pulse, spin, seedFloat, plantSway, fadeIn)
+     • App.jsx ANIM_CSS (floatLeaf, plantSway, seedShake, plantGrow,
+       plantGlow, confettiFall, waterDrop, floatUp, fadeSlideUp,
+       seedFloat, sparkleFloat, spin, slideIn)
+     • GardenScreen inline <style> (cloudDrift1/2, plantFloat,
+       floatUp, fadeIn, slideUp, backdropFade, sunlightPulse, leafFall,
+       mascotBreath, mascotSway, mascotShake, mascotJump, mascotEnter)
+   Duplicates removed; canonical version kept.
+   ══════════════════════════════════════ */
+
+/* ── Core ── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0);    }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0);    }
+}
+
+@keyframes backdropFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Spin / Pulse ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1);    opacity: 1;    }
+  50%       { transform: scale(1.08); opacity: 0.85; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+}
+
+/* ── Plant / Seed ── */
+@keyframes seedFloat {
+  0%, 100% { transform: translateY(0);   }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes plantSway {
+  0%, 100% { transform: rotate(0deg);    }
+  25%       { transform: rotate(3deg);    }
+  75%       { transform: rotate(-3deg);   }
+}
+
+@keyframes plantFloat {
+  0%, 100% { transform: translateY(0);   }
+  50%       { transform: translateY(-4px); }
+}
+
+@keyframes plantGrow {
+  from { transform: scale(0.7) translateY(20px); opacity: 0; }
+  to   { transform: scale(1)   translateY(0);    opacity: 1; }
+}
+
+@keyframes plantGlow {
+  from { filter: drop-shadow(0 0  6px rgba(61, 171, 80, 0.5)); }
+  to   { filter: drop-shadow(0 0 18px rgba(61, 171, 80, 0.9)); }
+}
+
+@keyframes seedShake {
+  0%, 100% { transform: translateX(0);  }
+  25%       { transform: translateX(-4px); }
+  75%       { transform: translateX(4px);  }
+}
+
+/* ── Float / Fall ── */
+@keyframes floatUp {
+  0%   { transform: translate(-50%, 0) scale(0.8);   opacity: 0; }
+  15%  { transform: translate(-50%, -20px) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, -100px) scale(0.9); opacity: 0; }
+}
+
+@keyframes floatLeaf {
+  0%, 100% { transform: translateY(0)    rotate(-5deg); }
+  50%       { transform: translateY(-10px) rotate(5deg);  }
+}
+
+@keyframes sparkleFloat {
+  0%, 100% { transform: translateY(0)    scale(1);   opacity: 1;   }
+  50%       { transform: translateY(-12px) scale(1.2); opacity: 0.7; }
+}
+
+/* ── Celebration ── */
+@keyframes confettiFall {
+  from { transform: translateY(0)    rotate(0deg);   opacity: 1; }
+  to   { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+}
+
+@keyframes waterDrop {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(100vh); opacity: 0; }
+}
+
+/* ── Garden Ambience ── */
+@keyframes cloudDrift1 {
+  from { transform: translateX(-120%);  }
+  to   { transform: translateX(400px);  }
+}
+
+@keyframes cloudDrift2 {
+  from { transform: translateX(-150%);  }
+  to   { transform: translateX(400px);  }
+}
+
+@keyframes sunlightPulse {
+  0%   { opacity: 0.4; }
+  100% { opacity: 0.8; }
+}
+
+@keyframes leafFall {
+  0%   { transform: translateY(-10px)  translateX(0)    rotate(0deg);   opacity: 0;   }
+  10%  { opacity: 0.7; }
+  90%  { opacity: 0.7; }
+  100% { transform: translateY(600px) translateX(-80px) rotate(360deg); opacity: 0;   }
+}
+
+/* ── Mascot ── */
+@keyframes mascotBreath {
+  0%, 100% { transform: translateY(0)   scale(1);     }
+  50%       { transform: translateY(-8px) scale(1.015); }
+}
+
+@keyframes mascotSway {
+  0%, 100% { transform: rotate(0deg);     }
+  25%       { transform: rotate(-1.2deg);  }
+  75%       { transform: rotate(1.2deg);   }
+}
+
+@keyframes mascotShake {
+  0%, 100% { transform: translateX(0)  rotate(0deg);    }
+  20%       { transform: translateX(-3px) rotate(-1.5deg); }
+  40%       { transform: translateX(3px)  rotate(1.5deg);  }
+  60%       { transform: translateX(-2px) rotate(-0.8deg); }
+  80%       { transform: translateX(2px)  rotate(0.8deg);  }
+}
+
+@keyframes mascotJump {
+  0%   { transform: translateY(0)    scale(1);    }
+  30%  { transform: translateY(-44px) scale(1.04); }
+  55%  { transform: translateY(-16px) scale(0.96); }
+  80%  { transform: translateY(-4px)  scale(1.01); }
+  100% { transform: translateY(0)    scale(1);    }
+}
+
+@keyframes mascotEnter {
+  0%   { transform: translateY(80px) scale(0.85); opacity: 0; }
+  65%  { transform: translateY(-10px) scale(1.03); opacity: 1; }
+  100% { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+
+/* ══════════════════════════════════════
+   GLOBAL COMPONENT STYLES
+   (avoid needing inline for universal patterns)
+   ══════════════════════════════════════ */
+
+/* Garden scene ambient overlays */
+.sunbeams-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 224, 0.15) 0%, transparent 60%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  animation: sunlightPulse 8s ease-in-out infinite alternate;
+  z-index: 1;
+}
+
+.leaf-drift {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: rgba(74, 222, 128, 0.35);
+  border-radius: 2px 8px 2px 8px;
+  animation: leafFall 7s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Floating action buttons in garden */
+.floating-action-btn {
+  transition:
+    transform var(--dur-base) var(--ease-spring),
+    box-shadow var(--dur-base) var(--ease-out) !important;
+}
+.floating-action-btn:hover {
+  transform: scale(1.1) translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16) !important;
+}
+
+/* Plant pedestal hover */
+.plant-pedestal-container {
+  transition: transform var(--dur-slow) var(--ease-out) !important;
+}
+.plant-pedestal-container:hover {
+  transform: translate(-50%, -100%) scale(1.05) !important;
+}
+
+/* Habit checkbox press state */
+.habit-checkbox {
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out) !important;
+}
+.habit-checkbox:hover {
+  transform: scale(1.08) !important;
+}
+
+/* Mascot base */
+.mascot-img {
+  width: 157px;
+  height: calc(157px * 1.15);
+  object-fit: contain;
+  transform-origin: center bottom;
+  will-change: transform;
+}
+
+.mascot-img.is-idle {
+  animation:
+    mascotBreath 3.5s ease-in-out infinite,
+    mascotSway   6s   ease-in-out infinite;
+}
+.mascot-img.is-entering {
+  animation: mascotEnter 1.2s var(--ease-spring-sm) both;
+}
+.mascot-img.is-watering {
+  animation: mascotShake 0.4s ease-in-out 3;
+}
+.mascot-img.is-celebrating {
+  animation: mascotJump 1.2s var(--ease-spring-sm) both;
+}

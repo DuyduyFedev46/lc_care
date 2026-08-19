@@ -1,0 +1,2 @@
+- [Session: Infrastructure Build & AI Migration 2026-05-13](session-2026-05-13-infra-build.md) — Built 12-file Firebase backend, migrated to DeepSeek, created legal docs, fixed 14 inconsistencies
+- [Image Processing: RemoveBG + WebP (in progress)](image-processing-removebg-webp.md) — 24 plants left to process, script ready, venv set up, model cached

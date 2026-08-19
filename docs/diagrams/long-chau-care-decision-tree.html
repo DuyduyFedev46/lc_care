@@ -1,0 +1,1999 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Long Châu Care — Decision Tree & User Flows</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --lc-blue: #0066CC;
+            --lc-blue-deep: #003D7A;
+            --lc-blue-light: #3399FF;
+            --lc-blue-pale: #E6F2FF;
+            --lc-orange: #FF8800;
+            
+            --j-treating: #C44545;
+            --j-risk: #E8A547;
+            --j-prev: #4A9D6F;
+            --j-kids: #E8869C;
+            --j-life: #3399FF;
+
+            --role-doctor: #7C3AED;      /* Tím — Bác sĩ */
+            --role-pharmacist: #0891B2;  /* Cyan — Dược sĩ */
+            --role-ai: #6366F1;          /* Indigo — AI */
+            --role-user: #059669;        /* Emerald — User */
+            --role-system: #6B7280;      /* Gray — System */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(180deg, #F0F4F8 0%, #E6F2FF 100%);
+            min-height: 100vh;
+        }
+
+        /* ===== ROLE LEGEND ===== */
+        .role-doctor { background: #F3E8FF; color: var(--role-doctor); border-color: #C4B5FD; }
+        .role-pharmacist { background: #CFFAFE; color: var(--role-pharmacist); border-color: #67E8F9; }
+        .role-ai { background: #EEF2FF; color: var(--role-ai); border-color: #A5B4FC; }
+        .role-user { background: #D1FAE5; color: var(--role-user); border-color: #6EE7B7; }
+        .role-system { background: #F3F4F6; color: var(--role-system); border-color: #D1D5DB; }
+
+        /* ===== TREE NODES ===== */
+        .tree-node {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            border: 2px solid #E5E7EB;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .tree-node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 102, 204, 0.12);
+        }
+
+        .tree-node.root {
+            background: linear-gradient(135deg, var(--lc-blue) 0%, var(--lc-blue-deep) 100%);
+            color: white;
+            border-color: var(--lc-blue);
+        }
+
+        .tree-node.gate {
+            background: linear-gradient(135deg, #F3E8FF 0%, #FAE8FF 100%);
+            border-color: #C4B5FD;
+        }
+
+        .tree-node.data-source {
+            background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+            border-color: #FCD34D;
+        }
+
+        .tree-node.outcome {
+            background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+            border-color: #6EE7B7;
+        }
+
+        .tree-node.warning {
+            background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+            border-color: #F87171;
+        }
+
+        .role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            border: 1px solid;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== TREE LINES ===== */
+        .tree-line-down {
+            width: 2px;
+            background: #CBD5E1;
+            margin: 0 auto;
+        }
+
+        .tree-line-h {
+            height: 2px;
+            background: #CBD5E1;
+        }
+
+        /* ===== FLOW CARDS ===== */
+        .flow-section {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px rgba(0, 102, 204, 0.08);
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+
+        .journey-treating { border-left: 8px solid var(--j-treating); }
+        .journey-risk { border-left: 8px solid var(--j-risk); }
+        .journey-prev { border-left: 8px solid var(--j-prev); }
+        .journey-kids { border-left: 8px solid var(--j-kids); }
+        .journey-life { border-left: 8px solid var(--j-life); }
+
+        .badge-treating { background: #FEF2F2; color: var(--j-treating); border: 1px solid #FECACA; }
+        .badge-risk { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+        .badge-prev { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; }
+        .badge-kids { background: #FDF2F8; color: #9D174D; border: 1px solid #FBCFE8; }
+        .badge-life { background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE; }
+
+        /* ===== JOURNEY TIMELINE ===== */
+        .journey-timeline-wrap {
+            padding: 32px 24px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .journey-timeline-wrap::-webkit-scrollbar { height: 6px; }
+        .journey-timeline-wrap::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 3px; }
+        .journey-timeline-wrap::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+        .journey-timeline {
+            display: flex;
+            align-items: flex-start;
+            gap: 0;
+            min-width: max-content;
+            position: relative;
+            padding: 20px 10px 30px;
+        }
+
+        .jt-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            width: 210px;
+            flex-shrink: 0;
+        }
+
+        /* Top connector line */
+        .jt-step::before {
+            content: '';
+            position: absolute;
+            top: 28px; left: 0; right: 0;
+            height: 3px;
+            background: #E2E8F0;
+            z-index: 0;
+        }
+        .jt-step:first-child::before { left: 50%; }
+        .jt-step:last-child::before { right: 50%; }
+
+        /* Dot on the line */
+        .jt-dot {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #CBD5E1;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+        .jt-step:first-child .jt-dot,
+        .jt-step:last-child .jt-dot {
+            width: 28px; height: 28px;
+            border-width: 4px;
+        }
+        .jt-step:first-child .jt-dot { background: var(--lc-blue); border-color: var(--lc-blue); }
+        .jt-step:last-child .jt-dot { background: #16A34A; border-color: #16A34A; }
+
+        /* Card */
+        .jt-card {
+            background: white;
+            border-radius: 14px;
+            padding: 14px 16px;
+            border: 2px solid #E5E7EB;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            width: 100%;
+            transition: all 0.25s ease;
+            position: relative;
+            z-index: 1;
+        }
+        .jt-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+
+        /* Role accent top bar */
+        .jt-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 12px; right: 12px;
+            height: 3px;
+            border-radius: 0 0 3px 3px;
+        }
+        .jt-role-doctor .jt-card::after { background: var(--role-doctor); }
+        .jt-role-pharmacist .jt-card::after { background: var(--role-pharmacist); }
+        .jt-role-ai .jt-card::after { background: var(--role-ai); }
+        .jt-role-user .jt-card::after { background: var(--role-user); }
+        .jt-role-system .jt-card::after { background: var(--role-system); }
+
+        .jt-card .jt-role {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 6px;
+        }
+        .jt-card .jt-title {
+            font-size: 13px; font-weight: 700; color: #111827;
+            margin-bottom: 4px; line-height: 1.4;
+        }
+        .jt-card .jt-desc {
+            font-size: 11px; color: #6B7280; line-height: 1.5;
+        }
+
+        /* Arrow between steps */
+        .jt-arrow {
+            display: flex; align-items: center; justify-content: center;
+            width: 52px; flex-shrink: 0; padding-top: 14px;
+        }
+        .jt-arrow svg { width: 28px; height: 28px; color: #94A3B8; }
+
+        /* Outcome step highlight */
+        .jt-step:last-child .jt-card {
+            background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+            border-color: #6EE7B7;
+        }
+        .jt-step:last-child .jt-card::after { background: #16A34A; }
+
+        /* Start step highlight */
+        .jt-step:first-child .jt-card {
+            border-color: var(--lc-blue);
+        }
+        .jt-step:first-child .jt-card::after { background: var(--lc-blue); }
+
+        @media (max-width: 768px) {
+            .jt-step { width: 180px; }
+            .jt-arrow { width: 36px; }
+        }
+
+        /* ===== HEADER ===== */
+        .header-gradient {
+            background: linear-gradient(135deg, #0066CC 0%, #003D7A 100%);
+        }
+
+        /* Persona avatars */
+        .persona-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 22px;
+            color: white;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .tab-button {
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 14px;
+            background: white;
+            color: #6B7280;
+            border: 2px solid #E5E7EB;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .tab-button.active {
+            background: var(--lc-blue);
+            color: white;
+            border-color: var(--lc-blue);
+        }
+
+        .tab-button:hover:not(.active) {
+            border-color: var(--lc-blue);
+            color: var(--lc-blue);
+        }
+
+        .view-content {
+            display: none;
+        }
+        .view-content.active {
+            display: block;
+        }
+
+        .tree-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .tree-grid-5 {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .tree-grid-3 { grid-template-columns: 1fr; }
+            .tree-grid-5 { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ===== ISOMETRIC GARDEN ===== */
+        .parallax-container {
+            perspective: 1000px;
+            overflow: hidden;
+            border-radius: 24px;
+        }
+        .parallax-image {
+            transition: transform 0.15s ease-out;
+            will-change: transform;
+        }
+        .parallax-container:hover .parallax-image {
+            transform: scale(1.02);
+        }
+
+        /* Stats bar */
+        .garden-stat {
+            background: white;
+            border-radius: 16px;
+            padding: 16px 20px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            border: 1px solid #E5E7EB;
+            transition: all 0.3s ease;
+        }
+        .garden-stat:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,102,204,0.1);
+        }
+        .garden-stat .stat-value {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--lc-blue), #16A34A);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        @keyframes countUp {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .count-animate {
+            animation: countUp 0.6s ease-out forwards;
+        }
+
+        /* Plant card — garden bed style */
+        .plant-bed-card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px 16px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid #E5E7EB;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .plant-bed-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            border-radius: 0 0 4px 4px;
+            transition: height 0.3s ease;
+        }
+        .plant-bed-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 16px 32px rgba(0,0,0,0.1);
+            border-color: transparent;
+        }
+        .plant-bed-card:hover::before {
+            height: 6px;
+        }
+        .plant-bed-card.active-plant {
+            border-color: transparent;
+            animation: plantPulse 2s ease-in-out infinite;
+        }
+        .plant-bed-card.paused-plant {
+            filter: grayscale(0.6);
+            opacity: 0.6;
+        }
+        .plant-bed-card.paused-plant:hover {
+            filter: grayscale(0);
+            opacity: 1;
+        }
+        @keyframes plantPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(74, 222, 128, 0); }
+        }
+
+        /* SVG Progress ring */
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        .progress-ring-bg {
+            fill: none;
+            stroke: #E5E7EB;
+            stroke-width: 6;
+        }
+        .progress-ring-fill {
+            fill: none;
+            stroke-width: 6;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Plant icon glow */
+        .plant-icon-glow {
+            font-size: 48px;
+            transition: all 0.3s ease;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+            animation: leafSway 3s ease-in-out infinite;
+            transform-origin: bottom center;
+        }
+        .plant-bed-card:hover .plant-icon-glow {
+            filter: drop-shadow(0 8px 16px rgba(0,0,0,0.3));
+            animation: leafSwayActive 0.6s ease-in-out infinite;
+        }
+
+        /* ===== LEAF SWAY ANIMATIONS ===== */
+        @keyframes leafSway {
+            0%, 100% { transform: rotate(0deg) translateY(0); }
+            25% { transform: rotate(2deg) translateY(-1px); }
+            50% { transform: rotate(-1.5deg) translateY(0.5px); }
+            75% { transform: rotate(1deg) translateY(-0.5px); }
+        }
+        @keyframes leafSwayActive {
+            0%, 100% { transform: rotate(0deg) translateY(0); }
+            20% { transform: rotate(6deg) translateY(-3px); }
+            40% { transform: rotate(-5deg) translateY(1px); }
+            60% { transform: rotate(4deg) translateY(-2px); }
+            80% { transform: rotate(-3deg) translateY(1px); }
+        }
+        @keyframes leafSwayClick {
+            0% { transform: rotate(0deg) translateY(0); }
+            10% { transform: rotate(12deg) translateY(-6px); }
+            20% { transform: rotate(-10deg) translateY(2px); }
+            30% { transform: rotate(8deg) translateY(-4px); }
+            40% { transform: rotate(-6deg) translateY(1px); }
+            50% { transform: rotate(4deg) translateY(-2px); }
+            60% { transform: rotate(-3deg) translateY(1px); }
+            70% { transform: rotate(2deg) translateY(-1px); }
+            80% { transform: rotate(-1deg) translateY(0); }
+            100% { transform: rotate(0deg) translateY(0); }
+        }
+        .plant-sway-click {
+            animation: leafSwayClick 1.2s ease-out forwards !important;
+        }
+
+        /* Stagger sway for each card */
+        .plant-bed-card:nth-child(1) .plant-icon-glow { animation-delay: 0s; }
+        .plant-bed-card:nth-child(2) .plant-icon-glow { animation-delay: 0.4s; }
+        .plant-bed-card:nth-child(3) .plant-icon-glow { animation-delay: 0.8s; }
+        .plant-bed-card:nth-child(4) .plant-icon-glow { animation-delay: 1.2s; }
+        .plant-bed-card:nth-child(5) .plant-icon-glow { animation-delay: 1.6s; }
+        .plant-bed-card:nth-child(6) .plant-icon-glow { animation-delay: 2.0s; }
+        .plant-bed-card:nth-child(7) .plant-icon-glow { animation-delay: 2.4s; }
+
+        /* Level badge */
+        .level-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            background: white;
+            border: 1.5px solid;
+            transition: all 0.3s ease;
+        }
+        .plant-bed-card:hover .level-badge {
+            transform: scale(1.08);
+        }
+
+        /* Sparkle animation for level up */
+        @keyframes sparkle {
+            0% { opacity: 0; transform: scale(0) rotate(0deg) translate(0, 0); }
+            50% { opacity: 1; transform: scale(1.2) rotate(180deg) translate(var(--sx, 20px), var(--sy, -20px)); }
+            100% { opacity: 0; transform: scale(0) rotate(360deg) translate(var(--sx, 40px), var(--sy, -40px)); }
+        }
+        .sparkle-particle {
+            position: fixed;
+            width: 6px; height: 6px;
+            background: #FBBF24;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: sparkle 1s ease-out forwards;
+            z-index: 9999;
+        }
+
+        /* Water drop animation */
+        @keyframes waterDrop {
+            0% { opacity: 0; transform: translateY(-20px) scale(0); }
+            30% { opacity: 1; transform: translateY(0) scale(1.2); }
+            60% { opacity: 0.8; transform: translateY(4px) scale(0.9); }
+            100% { opacity: 0; transform: translateY(8px) scale(0); }
+        }
+        .water-drop {
+            position: absolute;
+            width: 10px; height: 14px;
+            background: linear-gradient(180deg, #60A5FA, #3B82F6);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            pointer-events: none;
+            animation: waterDrop 1s ease-in forwards;
+        }
+
+        /* ===== GARDEN TIMELINE ===== */
+        .garden-timeline {
+            display: flex;
+            align-items: flex-end;
+            gap: 0;
+            padding: 40px 8px 24px;
+            overflow-x: auto;
+            position: relative;
+            min-height: 280px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .garden-timeline::-webkit-scrollbar { height: 4px; }
+        .garden-timeline::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 2px; }
+        .garden-timeline::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+
+        .gt-milestone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+            width: 140px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .gt-milestone:hover {
+            transform: translateY(-8px);
+        }
+        .gt-milestone::before {
+            content: '';
+            position: absolute;
+            top: 20px; left: 0; right: 0;
+            height: 3px;
+            background: #E2E8F0;
+            z-index: 0;
+            border-radius: 2px;
+        }
+        .gt-milestone:first-child::before { left: 50%; }
+        .gt-milestone:last-child::before { right: 50%; }
+
+        .gt-dot {
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: white;
+            border: 3px solid #CBD5E1;
+            z-index: 1;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .gt-milestone:first-child .gt-dot,
+        .gt-milestone:last-child .gt-dot {
+            width: 24px; height: 24px;
+            border-width: 4px;
+        }
+        .gt-milestone:first-child .gt-dot { background: var(--lc-blue); border-color: var(--lc-blue); }
+        .gt-milestone:last-child .gt-dot { background: #16A34A; border-color: #16A34A; }
+        .gt-milestone.reached .gt-dot {
+            background: #16A34A; border-color: #16A34A;
+            box-shadow: 0 0 12px rgba(22, 163, 74, 0.4);
+        }
+        .gt-milestone:hover .gt-dot {
+            transform: scale(1.4);
+            box-shadow: 0 0 16px rgba(0, 102, 204, 0.5);
+        }
+
+        .gt-plant-icon {
+            font-size: 28px;
+            margin-top: 8px;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+        .gt-milestone:hover .gt-plant-icon {
+            transform: scale(1.3);
+        }
+
+        .gt-card {
+            background: white;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            border: 1.5px solid #E5E7EB;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            text-align: center;
+            z-index: 1;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        .gt-milestone:hover .gt-card {
+            border-color: var(--lc-blue);
+            box-shadow: 0 6px 16px rgba(0,102,204,0.12);
+        }
+
+        .gt-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(8px);
+            background: #1F2937;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s ease;
+            z-index: 10;
+        }
+        .gt-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%; left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1F2937;
+        }
+        .gt-milestone:hover .gt-tooltip {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ===== PLANT DETAIL PANEL ===== */
+        #plant-detail {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #plant-detail.slide-up {
+            animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .gt-milestone { width: 110px; }
+            .garden-timeline { padding: 30px 4px 16px; min-height: 240px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="max-w-7xl mx-auto px-6 py-12">
+    
+    <!-- ===== HEADER ===== -->
+    <div class="header-gradient rounded-3xl p-10 text-white mb-10 shadow-xl">
+        <p class="text-blue-200 text-sm font-semibold mb-2 tracking-wider uppercase">Long Châu Care — Khu Vườn Sức Khỏe Việt</p>
+        <h1 class="text-4xl font-extrabold mb-3">Decision Tree & User Flows</h1>
+        <p class="text-blue-100 text-lg max-w-3xl">Tuân thủ tuyệt đối: <strong>AI không chẩn đoán</strong>. Mọi bệnh lý phải có nguồn từ Bác sĩ hoặc Lab có bác sĩ đọc. AI chỉ <em>nhắc nhở, tổng hợp, gợi ý hành chính</em> — Dược sĩ Long Châu duyệt mọi output y tế.</p>
+    </div>
+
+    <!-- ===== ROLE LEGEND ===== -->
+    <div class="bg-white rounded-2xl p-6 mb-8 shadow-md border border-gray-100">
+        <h3 class="font-bold text-gray-900 mb-4 text-lg">🎭 Phân vai trong hệ thống</h3>
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div class="role-doctor border-2 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="stethoscope" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">BÁC SĨ</span>
+                </div>
+                <p class="text-xs">Chẩn đoán, kê đơn, đọc kết quả lab. Nguồn dữ liệu y khoa hợp pháp duy nhất.</p>
+            </div>
+            <div class="role-pharmacist border-2 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="pill" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">DƯỢC SĨ LONG CHÂU</span>
+                </div>
+                <p class="text-xs">Tư vấn thuốc, duyệt mọi gợi ý AI trước khi push tới user. Human-in-the-loop.</p>
+            </div>
+            <div class="role-ai border-2 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="bot" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">AI HỆ THỐNG</span>
+                </div>
+                <p class="text-xs">Nhắc lịch, tổng hợp data, gợi ý hành chính. <strong>KHÔNG chẩn đoán, không kê đơn.</strong></p>
+            </div>
+            <div class="role-user border-2 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="user" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">USER / GIA ĐÌNH</span>
+                </div>
+                <p class="text-xs">Tự khai, tự ghi chỉ số, tự xác nhận. Có agency với data sức khỏe của mình.</p>
+            </div>
+            <div class="role-system border-2 rounded-xl p-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <i data-lucide="server" class="w-5 h-5"></i>
+                    <span class="font-bold text-sm">HỆ THỐNG</span>
+                </div>
+                <p class="text-xs">VNeID, Sổ sức khỏe điện tử, Trạm Công dân số — cung cấp data khách quan.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== VIEW SWITCHER ===== -->
+    <div class="flex gap-3 mb-8 flex-wrap">
+        <button class="tab-button active" onclick="switchView('tree', this)">🌳 Decision Tree</button>
+        <button class="tab-button" onclick="switchView('garden', this)">🌿 Khu Vườn 3D</button>
+        <button class="tab-button" onclick="switchView('flows', this)">📋 7 User Flows chi tiết</button>
+    </div>
+
+    <!-- ===== VIEW 1: DECISION TREE ===== -->
+    <div id="view-tree" class="view-content active">
+
+        <div class="bg-white rounded-3xl p-8 mb-8 shadow-lg border border-gray-100">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2">Decision Tree — Long Châu Care biết bệnh của user bằng cách nào?</h2>
+            <p class="text-gray-600 mb-6">Cây quyết định cho thấy <strong>mọi thông tin y tế đều có nguồn hợp pháp</strong> — không có "AI tự đoán bệnh".</p>
+
+            <!-- LEVEL 1 - ROOT -->
+            <div class="flex justify-center mb-2">
+                <div class="tree-node root w-80 text-center">
+                    <div class="flex items-center justify-center gap-2 mb-2">
+                        <i data-lucide="user-plus" class="w-5 h-5"></i>
+                        <span class="font-bold text-sm uppercase tracking-wider">User onboarding</span>
+                    </div>
+                    <p class="text-sm opacity-90">Long Châu Care cần biết user ở giai đoạn sức khỏe nào để cá nhân hóa</p>
+                </div>
+            </div>
+
+            <div class="tree-line-down" style="height: 30px;"></div>
+
+            <!-- LEVEL 2 - QUESTION -->
+            <div class="flex justify-center mb-2">
+                <div class="tree-node gate w-96 text-center">
+                    <span class="role-badge role-system mb-2 inline-flex">
+                        <i data-lucide="git-fork" class="w-3 h-3"></i> Hệ thống hỏi
+                    </span>
+                    <h3 class="font-extrabold text-gray-900 text-lg mt-1">"Long Châu lấy thông tin sức khỏe từ đâu?"</h3>
+                    <p class="text-xs text-gray-600 mt-1">5 nguồn hợp pháp, không có AI đoán</p>
+                </div>
+            </div>
+
+            <div class="tree-line-down" style="height: 30px;"></div>
+
+            <!-- LEVEL 3 - 5 DATA SOURCES -->
+            <div class="tree-grid-5 mb-2">
+                
+                <!-- Source 1: Doctor Prescription -->
+                <div class="tree-node data-source">
+                    <div class="role-badge role-doctor mb-2">
+                        <i data-lucide="stethoscope" class="w-3 h-3"></i> Bác sĩ
+                    </div>
+                    <h4 class="font-extrabold text-gray-900 text-sm mb-2">1. Đơn thuốc có chữ ký</h4>
+                    <ul class="text-xs text-gray-700 space-y-1">
+                        <li>• Upload ảnh đơn</li>
+                        <li>• OCR + xác thực</li>
+                        <li>• Hoặc từ BV partner</li>
+                    </ul>
+                    <div class="mt-3 p-2 bg-white/70 rounded-lg text-[10px] text-gray-600">
+                        <strong>Hợp pháp:</strong> Bác sĩ đã chẩn đoán & kê đơn
+                    </div>
+                </div>
+
+                <!-- Source 2: Lab with Doctor -->
+                <div class="tree-node data-source">
+                    <div class="role-badge role-doctor mb-2">
+                        <i data-lucide="test-tube" class="w-3 h-3"></i> BS đọc Lab
+                    </div>
+                    <h4 class="font-extrabold text-gray-900 text-sm mb-2">2. Kết quả Lab có BS đọc</h4>
+                    <ul class="text-xs text-gray-700 space-y-1">
+                        <li>• Long Châu Lab</li>
+                        <li>• Bác sĩ trả kết quả</li>
+                        <li>• Có ghi chú lâm sàng</li>
+                    </ul>
+                    <div class="mt-3 p-2 bg-white/70 rounded-lg text-[10px] text-gray-600">
+                        <strong>Hợp pháp:</strong> Bác sĩ ký nhận kết quả
+                    </div>
+                </div>
+
+                <!-- Source 3: VNeID -->
+                <div class="tree-node data-source">
+                    <div class="role-badge role-system mb-2">
+                        <i data-lucide="id-card" class="w-3 h-3"></i> Nhà nước
+                    </div>
+                    <h4 class="font-extrabold text-gray-900 text-sm mb-2">3. VNeID + Sổ SK điện tử</h4>
+                    <ul class="text-xs text-gray-700 space-y-1">
+                        <li>• User cho phép</li>
+                        <li>• Pull lịch sử y tế</li>
+                        <li>• Lịch tiêm CDC</li>
+                    </ul>
+                    <div class="mt-3 p-2 bg-white/70 rounded-lg text-[10px] text-gray-600">
+                        <strong>Hợp pháp:</strong> Dữ liệu đã xác thực bởi Bộ Y tế
+                    </div>
+                </div>
+
+                <!-- Source 4: User Self-Report -->
+                <div class="tree-node data-source">
+                    <div class="role-badge role-user mb-2">
+                        <i data-lucide="edit-3" class="w-3 h-3"></i> User
+                    </div>
+                    <h4 class="font-extrabold text-gray-900 text-sm mb-2">4. Self-report (có disclaimer)</h4>
+                    <ul class="text-xs text-gray-700 space-y-1">
+                        <li>• User tự khai bệnh nền</li>
+                        <li>• Đánh dấu "chưa xác thực"</li>
+                        <li>• Đề xuất xác thực lại</li>
+                    </ul>
+                    <div class="mt-3 p-2 bg-white/70 rounded-lg text-[10px] text-gray-600">
+                        <strong>Hợp pháp:</strong> User có quyền tự khai, có disclaimer
+                    </div>
+                </div>
+
+                <!-- Source 5: Citizen Station -->
+                <div class="tree-node data-source">
+                    <div class="role-badge role-system mb-2">
+                        <i data-lucide="building-2" class="w-3 h-3"></i> Trạm
+                    </div>
+                    <h4 class="font-extrabold text-gray-900 text-sm mb-2">5. Trạm Công dân số</h4>
+                    <ul class="text-xs text-gray-700 space-y-1">
+                        <li>• Đo chỉ số khách quan</li>
+                        <li>• HA, BMI, đường huyết</li>
+                        <li>• <strong>KHÔNG kèm chẩn đoán</strong></li>
+                    </ul>
+                    <div class="mt-3 p-2 bg-white/70 rounded-lg text-[10px] text-gray-600">
+                        <strong>Hợp pháp:</strong> Sensor cho ra số, BS đọc
+                    </div>
+                </div>
+            </div>
+
+            <div class="tree-line-down" style="height: 30px;"></div>
+
+            <!-- LEVEL 4 - AI PROCESSING -->
+            <div class="flex justify-center mb-2">
+                <div class="tree-node w-[600px]" style="background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%); border-color: #A5B4FC;">
+                    <div class="flex items-center justify-center gap-2 mb-2">
+                        <span class="role-badge role-ai">
+                            <i data-lucide="bot" class="w-3 h-3"></i> AI Tổng hợp
+                        </span>
+                    </div>
+                    <h3 class="font-extrabold text-gray-900 text-center text-lg mb-3">AI làm gì với data này?</h3>
+                    <div class="grid grid-cols-2 gap-3 text-xs">
+                        <div class="bg-green-50 border-2 border-green-200 rounded-lg p-3">
+                            <p class="font-bold text-green-700 mb-2">✅ AI ĐƯỢC làm</p>
+                            <ul class="text-green-800 space-y-1">
+                                <li>• Đọc đơn thuốc đã có</li>
+                                <li>• Nhắc lịch refill</li>
+                                <li>• Nhắc lịch tiêm CDC</li>
+                                <li>• Tổng hợp chỉ số → biểu đồ</li>
+                                <li>• Flag chỉ số ngoài ngưỡng</li>
+                                <li>• Gợi ý đặt lịch khám với BS</li>
+                            </ul>
+                        </div>
+                        <div class="bg-red-50 border-2 border-red-200 rounded-lg p-3">
+                            <p class="font-bold text-red-700 mb-2">❌ AI KHÔNG được làm</p>
+                            <ul class="text-red-800 space-y-1">
+                                <li>• Suy ra bệnh từ thuốc</li>
+                                <li>• Gọi tên bệnh từ chỉ số</li>
+                                <li>• Đề xuất phác đồ</li>
+                                <li>• Thay đổi liều thuốc</li>
+                                <li>• Tự chẩn đoán</li>
+                                <li>• Push kết quả y tế trực tiếp</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tree-line-down" style="height: 30px;"></div>
+
+            <!-- LEVEL 5 - PHARMACIST GATE -->
+            <div class="flex justify-center mb-2">
+                <div class="tree-node w-96" style="background: linear-gradient(135deg, #ECFEFF 0%, #CFFAFE 100%); border-color: #67E8F9;">
+                    <div class="text-center">
+                        <span class="role-badge role-pharmacist mb-2 inline-flex">
+                            <i data-lucide="shield-check" class="w-3 h-3"></i> Dược sĩ Long Châu
+                        </span>
+                        <h3 class="font-extrabold text-gray-900 text-lg mt-2">Cổng kiểm duyệt cuối cùng</h3>
+                        <p class="text-xs text-gray-700 mt-2">Mọi message y tế đến user PHẢI có Dược sĩ duyệt. Audit log đầy đủ. Compliance Bộ Y tế.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tree-line-down" style="height: 30px;"></div>
+
+            <!-- LEVEL 6 - USER OUTCOME -->
+            <div class="flex justify-center mb-2">
+                <div class="tree-node outcome w-[700px]">
+                    <div class="text-center mb-3">
+                        <span class="role-badge role-user inline-flex">
+                            <i data-lucide="sparkles" class="w-3 h-3"></i> User nhận được
+                        </span>
+                        <h3 class="font-extrabold text-gray-900 text-lg mt-2">Hành trình cá nhân hóa</h3>
+                    </div>
+                    <div class="grid grid-cols-7 gap-2 text-xs">
+                        <div class="bg-white rounded-lg p-2 text-center border border-red-200">
+                            <div class="text-xl mb-1">🫚</div>
+                            <p class="font-bold" style="color: var(--j-treating)">Điều trị</p>
+                            <p class="text-gray-600 mt-1">Cây Gừng</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-2 text-center border border-amber-200">
+                            <div class="text-xl mb-1">🟡</div>
+                            <p class="font-bold" style="color: #B45309">Theo dõi</p>
+                            <p class="text-gray-600 mt-1">Cây Nghệ</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-2 text-center border border-green-200">
+                            <div class="text-xl mb-1">🌾</div>
+                            <p class="font-bold" style="color: var(--j-prev)">Phòng ngừa</p>
+                            <p class="text-gray-600 mt-1">Rau Má</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-2 text-center border border-pink-200">
+                            <div class="text-xl mb-1">🍃</div>
+                            <p class="font-bold" style="color: var(--j-kids)">Nhi khoa</p>
+                            <p class="text-gray-600 mt-1">Tía tô</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-2 text-center border border-blue-200">
+                            <div class="text-xl mb-1">🍵</div>
+                            <p class="font-bold" style="color: var(--j-life)">Lifestyle</p>
+                            <p class="text-gray-600 mt-1">Cây Trà</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-2 text-center border border-fuchsia-200">
+                            <div class="text-xl mb-1">🪷</div>
+                            <p class="font-bold" style="color: #9D174D">Thai sản</p>
+                            <p class="text-gray-600 mt-1">Hoa Sen</p>
+                        </div>
+                        <div class="bg-white rounded-lg p-2 text-center border border-emerald-200">
+                            <div class="text-xl mb-1">🌿</div>
+                            <p class="font-bold" style="color: #065F46">Vận động</p>
+                            <p class="text-gray-600 mt-1">Cây Sả</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== EXAMPLE WALKTHROUGH ===== -->
+        <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-3xl p-8 border-2 border-purple-100 shadow-lg">
+            <h2 class="text-2xl font-extrabold text-gray-900 mb-2">🔍 Ví dụ minh họa: Cô Mai có bệnh huyết áp</h2>
+            <p class="text-gray-600 mb-6">Long Châu Care biết Cô Mai bị HA bằng cách nào? <strong>KHÔNG bằng AI tự đoán.</strong></p>
+
+            <div class="space-y-4">
+                <div class="flex gap-4 items-start bg-white rounded-2xl p-5 border-2 border-purple-100">
+                    <div class="role-badge role-doctor flex-shrink-0">Bác sĩ</div>
+                    <div>
+                        <p class="font-bold text-gray-900">Bác sĩ tại BV Chợ Rẫy đã chẩn đoán & kê Amlodipine 5mg/ngày</p>
+                        <p class="text-sm text-gray-600 mt-1">Đơn có chữ ký, mã số chứng chỉ hành nghề, dấu BV. Đây là <strong>tài liệu y khoa hợp pháp duy nhất</strong> nói "Cô Mai bị cao huyết áp".</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 items-start bg-white rounded-2xl p-5 border-2 border-green-100">
+                    <div class="role-badge role-user flex-shrink-0">User</div>
+                    <div>
+                        <p class="font-bold text-gray-900">Con gái upload đơn thuốc vào app · Xác nhận</p>
+                        <p class="text-sm text-gray-600 mt-1">"Đây là đơn của Mẹ tôi, BS Nguyễn Văn A tại BV Chợ Rẫy, ngày 15/10/2025" → User confirm authenticity.</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 items-start bg-white rounded-2xl p-5 border-2 border-indigo-100">
+                    <div class="role-badge role-ai flex-shrink-0">AI</div>
+                    <div>
+                        <p class="font-bold text-gray-900">AI OCR đơn thuốc · Trích xuất thông tin hành chính</p>
+                        <p class="text-sm text-gray-600 mt-1">"Tên thuốc: Amlodipine 5mg · Liều: 1 viên/sáng · 30 ngày". AI KHÔNG nói "Cô Mai bị HA" — AI chỉ đọc cái BS đã viết.</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 items-start bg-white rounded-2xl p-5 border-2 border-cyan-100">
+                    <div class="role-badge role-pharmacist flex-shrink-0">Dược sĩ</div>
+                    <div>
+                        <p class="font-bold text-gray-900">Dược sĩ Long Châu duyệt đơn · Tạo Care Plan</p>
+                        <p class="text-sm text-gray-600 mt-1">DS thấy Amlodipine = thuốc HA → Đề xuất Cô Mai trồng Cây Gừng (Điều trị). DS có chứng chỉ → có quyền liên hệ phác đồ với bệnh.</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 items-start bg-green-50 rounded-2xl p-5 border-2 border-green-300">
+                    <div class="text-2xl flex-shrink-0">✅</div>
+                    <div>
+                        <p class="font-bold text-gray-900">Kết quả: Long Châu Care đồng hành hợp pháp</p>
+                        <p class="text-sm text-gray-700 mt-1">Mỗi message nhắc thuốc, mỗi gợi ý refill, mỗi đề xuất lab test đều dẫn nguồn về <strong>đơn thuốc gốc của BS</strong>. Audit log trace được. Compliance 100%.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== VIEW 2: 5 USER FLOWS ===== -->
+    <div id="view-flows" class="view-content">
+
+        <!-- ===== FLOW 1: TREATING ===== -->
+        <div class="flow-section journey-treating">
+            <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-red-50 to-white">
+                <div class="flex items-start gap-5">
+                    <div class="persona-avatar" style="background: var(--j-treating)">M</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2 flex-wrap">
+                            <span class="badge-treating text-xs font-bold px-3 py-1 rounded-md uppercase tracking-wider">🔴 Hành trình Điều trị</span>
+                            <span class="pill bg-gray-100 text-gray-700">Cây Gừng 🫚 · Lv.12</span>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-gray-900">Cô Mai · 65 tuổi · Cao huyết áp 8 năm</h2>
+                        <p class="text-gray-600 mt-1">Có đơn thuốc Amlodipine từ BS BV Chợ Rẫy. Tuân thủ tốt nhưng hay quên đo HA.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="journey-timeline-wrap">
+                <div class="journey-timeline">
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Con gái</div>
+                            <div class="jt-title">Upload đơn thuốc BS đã kê cho Mẹ</div>
+                            <div class="jt-desc">App yêu cầu nguồn hợp pháp. Con gái upload ảnh đơn Amlodipine từ BV Chợ Rẫy (BS Nguyễn Văn A, 15/10/2025).</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Trích xuất</div>
+                            <div class="jt-title">OCR đơn thuốc — KHÔNG suy đoán bệnh</div>
+                            <div class="jt-desc"><em>"Amlodipine 5mg · 1 viên/sáng · BS Nguyễn Văn A"</em>. AI chỉ đọc, không kết luận. Liên hệ thuốc ↔ bệnh là việc của Dược sĩ.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-pharmacist">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-pharmacist)">🧑‍⚕️ Dược sĩ · Duyệt</div>
+                            <div class="jt-title">Xác nhận đơn hợp lệ → Đề xuất Cây Gừng</div>
+                            <div class="jt-desc">DS kiểm tra: đơn hợp lệ + thuốc HA → Hành trình Điều trị → Cây Gừng + nhắc 6h sáng + đo HA 2 ngày/lần.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Hàng ngày</div>
+                            <div class="jt-title">Ghi chỉ số HA — được khen, không bị phán xét</div>
+                            <div class="jt-desc">Cô Mai ghi HA 145/95. App: <em>"Cảm ơn Mẹ đã trung thực! Cây Gừng được tưới 💧"</em>. Không nói "Mẹ bị nặng".</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Flag</div>
+                            <div class="jt-title">Flag pattern — không chẩn đoán</div>
+                            <div class="jt-desc">"5 lần/tuần ngoài ngưỡng <strong>BS đề ra</strong>". AI so với ngưỡng BS set, không tự nghĩ ngưỡng. Escalate lên DS.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-pharmacist">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-pharmacist)">🧑‍⚕️ Dược sĩ · Tư vấn</div>
+                            <div class="jt-title">Chat với Cô Mai → Đề xuất lab + gặp BS</div>
+                            <div class="jt-desc"><em>"Chỉ số HA tăng, cô nên đặt lab tại Long Châu hoặc tái khám BS Nguyễn Văn A"</em>. DS không tự đổi đơn.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#16A34A">✅ Outcome</div>
+                            <div class="jt-title">BS điều chỉnh đơn → App cập nhật Care Plan</div>
+                            <div class="jt-desc">Vòng lặp khép kín: <strong>App → Dược sĩ → BS → App</strong>. Mọi thay đổi y khoa do BS quyết. App là người đồng hành.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FLOW 2: RAISING KIDS ===== -->
+        <div class="flow-section journey-kids">
+            <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-pink-50 to-white">
+                <div class="flex items-start gap-5">
+                    <div class="persona-avatar" style="background: var(--j-kids)">L</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2 flex-wrap">
+                            <span class="badge-kids text-xs font-bold px-3 py-1 rounded-md uppercase tracking-wider">👶 Hành trình Nhi khoa</span>
+                            <span class="pill bg-gray-100 text-gray-700">Cây Tía tô 🍃 · Lv.3</span>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-gray-900">Chị Linh · 32 tuổi · Mẹ của Bin (5 tuổi)</h2>
+                        <p class="text-gray-600 mt-1">Có sổ tiêm chủng của Bin tại Long Châu Tiêm Chủng. Hay quên lịch tiêm tiếp theo.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="journey-timeline-wrap">
+                <div class="journey-timeline">
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Mẹ</div>
+                            <div class="jt-title">Tạo profile Bin + link sổ tiêm chủng</div>
+                            <div class="jt-desc">Bin đã tiêm 6 mũi tại Long Châu Tiêm Chủng. Linh xác nhận → app pull lịch sử có sẵn, không cần upload lại.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Tham chiếu</div>
+                            <div class="jt-title">Tham chiếu lịch CDC Việt Nam — không tự nghĩ</div>
+                            <div class="jt-desc">CDC quy định: trẻ 5 tuổi cần phế cầu mũi 2. AI lấy data từ CDC + match tuổi Bin → flag "sắp đến hạn".</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-pharmacist">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-pharmacist)">🧑‍⚕️ Dược sĩ · Duyệt</div>
+                            <div class="jt-title">DS duyệt lịch nhắc → Push notification</div>
+                            <div class="jt-desc">DS xác nhận: lịch CDC chuẩn, Bin đủ tuổi → cho phép app nhắc Linh trước 3 ngày.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Hành động</div>
+                            <div class="jt-title">Nhận nhắc → Đặt lịch tiêm 1-tap</div>
+                            <div class="jt-desc">Long Châu Tiêm Chủng Q7 còn slot 8h T4. Linh đặt + đổi voucher giảm 30% (−3,000 ⓕ).</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-system">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-doctor)">🩺 BS + DS · Tại chỗ</div>
+                            <div class="jt-title">BS khám sàng lọc + DS tiêm</div>
+                            <div class="jt-desc">Trẻ em tiêm vắc-xin phải có BS khám trước. BS ký xác nhận → app log thành achievement.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Theo dõi</div>
+                            <div class="jt-title">Nhắc 24h sau: checklist phản ứng sau tiêm</div>
+                            <div class="jt-desc">Gửi checklist từ BS: "Sốt? Sưng? Khó chịu?". Nếu Linh tick có → escalate cho DS chat.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#16A34A">✅ Outcome</div>
+                            <div class="jt-title">Bin tiêm đúng lịch · Cây Tía tô mọc thêm tầng</div>
+                            <div class="jt-desc">Mọi quyết định y khoa do BS. App chỉ là <em>người quản gia hành chính</em> giúp Linh không quên lịch.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FLOW 3: PREVENTION ===== -->
+        <div class="flow-section journey-prev">
+            <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-green-50 to-white">
+                <div class="flex items-start gap-5">
+                    <div class="persona-avatar" style="background: var(--j-prev)">B</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2 flex-wrap">
+                            <span class="badge-prev text-xs font-bold px-3 py-1 rounded-md uppercase tracking-wider">🟢 Hành trình Phòng ngừa</span>
+                            <span class="pill bg-gray-100 text-gray-700">Cây Rau Má 🌾 · Lv.5</span>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-gray-900">Anh Bình · 42 tuổi · Khỏe mạnh</h2>
+                        <p class="text-gray-600 mt-1">Khám tổng quát công ty hàng năm. Anh trai từng bị ung thư đại tràng (gia đình tự khai).</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="journey-timeline-wrap">
+                <div class="journey-timeline">
+
+                    <div class="jt-step jt-role-system">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-system)">🏛️ Hệ thống · VNeID</div>
+                            <div class="jt-title">Xác thực VNeID → Pull Sổ SK điện tử</div>
+                            <div class="jt-desc">App lấy: đã tiêm cúm 2024, khám tổng quát 2023. <strong>Data nhà nước, hợp pháp.</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Self-report</div>
+                            <div class="jt-title">Tự khai tiền sử gia đình (có disclaimer)</div>
+                            <div class="jt-desc"><em>"Anh trai từng ung thư đại tràng"</em> — có disclaimer: chưa BS xác thực, khuyến nghị xác nhận lại.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-system">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-system)">🏥 Trạm Công dân số</div>
+                            <div class="jt-title">Đo chỉ số khách quan — không kết luận</div>
+                            <div class="jt-desc">HA 128/82 · BMI 24.5 · Đường 95. Trạm cho số, không kết luận bệnh. (+100 ⓕ check-in).</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Tham chiếu BYT</div>
+                            <div class="jt-title">Tham chiếu hướng dẫn tầm soát BYT cho ≥40t</div>
+                            <div class="jt-desc">BYT khuyến cáo: ≥40t nên tầm soát đại tràng. AI dẫn nguồn BYT, không tự nghĩ. Flag lên DS.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-pharmacist">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-pharmacist)">🧑‍⚕️ Dược sĩ · Tư vấn</div>
+                            <div class="jt-title">Gợi ý gặp BS để tư vấn tầm soát</div>
+                            <div class="jt-desc">DS không tự kê lab. DS: <em>"Anh nên gặp BS để được khám sàng lọc và chỉ định lab phù hợp."</em></div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-doctor)">🩺 BS Long Châu Lab</div>
+                            <div class="jt-title">BS khám + chỉ định nội soi → KQ bình thường</div>
+                            <div class="jt-desc">BS có chứng chỉ kê lab, ký xác nhận. App cập nhật Health ID + Cây Rau Má xanh hơn.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#16A34A">✅ Outcome</div>
+                            <div class="jt-title">Tầm soát thành công · 3 năm sau lặp lại</div>
+                            <div class="jt-desc">BS quyết định chu kỳ tiếp theo. App nhắc theo lịch BS — không tự đặt lịch.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FLOW 4: LIFESTYLE ===== -->
+        <div class="flow-section journey-life">
+            <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-white">
+                <div class="flex items-start gap-5">
+                    <div class="persona-avatar" style="background: var(--j-life)">M</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2 flex-wrap">
+                            <span class="badge-life text-xs font-bold px-3 py-1 rounded-md uppercase tracking-wider">💪 Hành trình Lifestyle</span>
+                            <span class="pill bg-gray-100 text-gray-700">Cây Trà 🍵 · Lv.8</span>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-gray-900">Minh · 28 tuổi · Khỏe, chưa có chẩn đoán nào</h2>
+                        <p class="text-gray-600 mt-1">Văn phòng, dùng Apple Watch. KHÔNG có bệnh lý — chỉ muốn lifestyle tốt hơn.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="journey-timeline-wrap">
+                <div class="journey-timeline">
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Chọn mục tiêu</div>
+                            <div class="jt-title">Onboarding quiz: "Mục tiêu của bạn?" → Lifestyle</div>
+                            <div class="jt-desc">Không cần đơn thuốc, không cần data y tế. Lifestyle = wellness, không phải y tế.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">⌚ Apple Health</div>
+                            <div class="jt-title">Connect wearable: 3,200 bước · ngủ 5.5h</div>
+                            <div class="jt-desc">Data wearable là <em>tham khảo</em>, không phải y tế. Không cần BS duyệt.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Wellness</div>
+                            <div class="jt-title">Gợi ý quest lifestyle — không phải y tế</div>
+                            <div class="jt-desc">"5,000 bước/ngày · Ngủ trước 23h · 2L nước". <strong>Wellness habit chung</strong>, không cần BS duyệt từng cái.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-pharmacist">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-pharmacist)">🧑‍⚕️ Dược sĩ · Tư vấn OTC</div>
+                            <div class="jt-title">Gợi ý TPCN — không kê thuốc</div>
+                            <div class="jt-desc">Melatonin & Magie B6 là <strong>TPCN OTC</strong>. Có disclaimer: "Nếu mất ngủ kéo dài, hãy gặp BS."</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Streak</div>
+                            <div class="jt-title">Streak 7 ngày đi bộ → Cây Trà ra búp</div>
+                            <div class="jt-desc">+150 ⓕ thành tựu wellness. Không liên quan y tế.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Gợi ý khám</div>
+                            <div class="jt-title">Gợi ý gói khám tổng quát — 2 năm chưa khám</div>
+                            <div class="jt-desc">Dẫn khuyến cáo BYT: nên khám ≥1 năm/lần. <strong>Không kết luận bệnh — chỉ recommend.</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#16A34A">✅ Outcome</div>
+                            <div class="jt-title">Có baseline từ BS · Chuyển hành trình tự nhiên</div>
+                            <div class="jt-desc">Sau khám nếu phát hiện gì → chuyển Lifestyle → Nguy cơ → Điều trị. Long Châu là touchpoint quen.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FLOW 5: AT-RISK ===== -->
+        <div class="flow-section journey-risk">
+            <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-white">
+                <div class="flex items-start gap-5">
+                    <div class="persona-avatar" style="background: var(--j-risk)">H</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2 flex-wrap">
+                            <span class="badge-risk text-xs font-bold px-3 py-1 rounded-md uppercase tracking-wider">🟡 Hành trình Theo dõi</span>
+                            <span class="pill bg-gray-100 text-gray-700">Cây Nghệ 🟡 · Lv.4</span>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-gray-900">Anh Hùng · 48 tuổi · Có kết quả BS đọc "tiền tiểu đường"</h2>
+                        <p class="text-gray-600 mt-1">Có kết quả lab + BS Long Châu đọc chính thức. Hành trình "Theo dõi" theo chỉ định BS.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="journey-timeline-wrap">
+                <div class="journey-timeline">
+
+                    <div class="jt-step jt-role-system">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-system)">🏥 Trạm Công dân số</div>
+                            <div class="jt-title">Đo chỉ số: đường huyết 130 · BMI 29</div>
+                            <div class="jt-desc">Flag khách quan: "Ngoài ngưỡng tham chiếu, nên gặp BS." <strong>KHÔNG kết luận bệnh.</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-pharmacist">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-pharmacist)">🧑‍⚕️ Dược sĩ · Tư vấn</div>
+                            <div class="jt-title">Đề xuất đặt lab + gặp BS — không nói bệnh</div>
+                            <div class="jt-desc"><em>"Chỉ số ngoài ngưỡng. Anh nên đặt lab HbA1c và gặp BS để có chẩn đoán chính thức."</em></div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-doctor)">🩺 BS Long Châu Lab</div>
+                            <div class="jt-title">BS chẩn đoán "tiền tiểu đường" — người duy nhất</div>
+                            <div class="jt-desc">HbA1c 6.5%. BS ký + chỉ định: "Lifestyle 3-6 tháng, đo đường tuần/lần, lab lại sau 3 tháng."</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-pharmacist">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-pharmacist)">🧑‍⚕️ Dược sĩ · Tạo Care Plan</div>
+                            <div class="jt-title">Dựa trên chỉ định BS → Cây Nghệ + lộ trình</div>
+                            <div class="jt-desc">DS có chỉ định BS → tạo lộ trình: đo đường CN sáng, log cân nặng T2, log bữa ăn 3 ngày/tuần.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Tuân thủ</div>
+                            <div class="jt-title">8 tuần: đo đường, ăn lành, đi bộ</div>
+                            <div class="jt-desc">Cây Nghệ lớn dần. App hiển thị trend giảm (130→118) <strong>khách quan</strong> — không kết luận "khỏi bệnh".</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-doctor)">🩺 BS · Tái khám</div>
+                            <div class="jt-title">Lab lại sau 3 tháng → HbA1c 5.8% → Thoát ngưỡng</div>
+                            <div class="jt-desc">BS ký: "Tiếp tục lifestyle, tái khám 12 tháng." App cập nhật theo chỉ định BS.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#16A34A">✅ Outcome</div>
+                            <div class="jt-title">Thoát tiền tiểu đường · KHÔNG cần thuốc</div>
+                            <div class="jt-desc">BS chẩn đoán + xác nhận khỏi. Hùng đưa vợ con vào Long Châu Care cùng phòng ngừa. CLV ×4.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <!-- ===== FLOW 6: PREGNANCY — LOTUS ===== -->
+        <div class="flow-section" style="border-left: 8px solid #9D174D;">
+            <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-fuchsia-50 to-white">
+                <div class="flex items-start gap-5">
+                    <div class="persona-avatar" style="background: #9D174D">T</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2 flex-wrap">
+                            <span class="text-xs font-bold px-3 py-1 rounded-md uppercase tracking-wider" style="background:#FDF2F8;color:#9D174D;border:1px solid #FBCFE8">🪷 Hành trình Thai sản</span>
+                            <span class="pill bg-gray-100 text-gray-700">Cây Hoa Sen 🪷 · Lv.2</span>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-gray-900">Chị Thảo · 29 tuổi · Thai kỳ tuần 18</h2>
+                        <p class="text-gray-600 mt-1">Có phiếu khám thai từ BS Sản khoa. Journey có thời hạn ~9 tháng — sen nở hoa → tốt nghiệp → tự động chuyển Sả + Tía tô.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="journey-timeline-wrap">
+                <div class="journey-timeline">
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Mẹ</div>
+                            <div class="jt-title">Upload phiếu khám thai — BS Sản khoa xác nhận</div>
+                            <div class="jt-desc">Thai 8 tuần, BS chỉ định: khám thai định kỳ 4 tuần/lần, uống Acid Folic + Sắt mỗi sáng. <strong>BS là nguồn duy nhất.</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-pharmacist">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-pharmacist)">🧑‍⚕️ Dược sĩ · Duyệt</div>
+                            <div class="jt-title">DS xác minh phiếu khám → Tạo Care Plan Thai sản</div>
+                            <div class="jt-desc">DS: Thai sản → Hành trình có thời hạn → <strong>Cây Hoa Sen</strong>. Lịch: khám thai 4 tuần/lần + uống vitamin sáng + siêu âm mốc 12-22-32 tuần.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Nhắc lịch</div>
+                            <div class="jt-title">Nhắc lịch khám thai + uống vitamin — không chẩn đoán</div>
+                            <div class="jt-desc">AI tham chiếu lịch BS set: T4 tuần sau khám thai định kỳ. Nhắc 7h sáng: "Uống Acid Folic + Sắt". <strong>Không tự ý thêm/xóa mốc khám.</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Tuân thủ</div>
+                            <div class="jt-title">28 tuần tuân thủ — Sen nở hoa Lv.5</div>
+                            <div class="jt-desc">Thảo không bỏ lỡ mốc khám nào. Cây Sen đạt Lv.5. Chồng thấy cây tươi trong Family Garden mỗi ngày.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-system">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#9D174D">🪷 Graduation</div>
+                            <div class="jt-title">Sinh xong — Sen tốt nghiệp → Auto tạo Sả + Tía tô</div>
+                            <div class="jt-desc"><strong>plant_status → 'graduated'</strong> (KHÔNG dead). Animation "sen nở hoa" + badge "Mẹ Sen Vàng". Auto tạo: Sả (vận động phục hồi) cho mẹ + Tía tô (tiêm chủng) cho bé.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#16A34A">✅ Outcome</div>
+                            <div class="jt-title">Khu Vườn mở rộng tự nhiên — 2 cây mới từ 1 hành trình</div>
+                            <div class="jt-desc">Mẹ: Sả (đi bộ 5,000 bước). Bé: Tía tô (lịch tiêm CDC). Badge "Vườn Sen" vĩnh viễn trong family garden. KHÔNG cần onboard lại.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FLOW 7: EXERCISE — LEMONGRASS ===== -->
+        <div class="flow-section" style="border-left: 8px solid #065F46;">
+            <div class="p-6 border-b border-gray-100 bg-gradient-to-r from-emerald-50 to-white">
+                <div class="flex items-start gap-5">
+                    <div class="persona-avatar" style="background: #065F46">V</div>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-2 flex-wrap">
+                            <span class="text-xs font-bold px-3 py-1 rounded-md uppercase tracking-wider" style="background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0">🌿 Hành trình Vận động</span>
+                            <span class="pill bg-gray-100 text-gray-700">Cây Sả 🌿 · Lv.6</span>
+                        </div>
+                        <h2 class="text-2xl font-extrabold text-gray-900">Chị Vân · 35 tuổi · Sau sinh 6 tháng · Muốn phục hồi</h2>
+                        <p class="text-gray-600 mt-1">Từng có Cây Sen (thai sản) → tốt nghiệp → auto chuyển sang Sả. Mục tiêu: đi bộ 5,000 bước/ngày, phục hồi sau sinh.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="journey-timeline-wrap">
+                <div class="journey-timeline">
+
+                    <div class="jt-step jt-role-system">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#9D174D">🪷 Auto từ Sen</div>
+                            <div class="jt-title">Sen tốt nghiệp → Auto tạo Sả cho mẹ</div>
+                            <div class="jt-desc">Không cần onboard lại. System tự chuyển: Hoa Sen (graduated) → Cây Sả (Phòng ngừa/Vận động). Giữ lại toàn bộ điểm + streak history.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Đề xuất quest</div>
+                            <div class="jt-title">Gợi ý mục tiêu vận động — wellness, không y tế</div>
+                            <div class="jt-desc">"Sau sinh 6 tháng: đi bộ 3,000 → 5,000 bước, yoga nhẹ 15 phút, uống 2L nước." <strong>Wellness habit</strong>, không cần BS duyệt từng quest.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">⌚ Apple Health</div>
+                            <div class="jt-title">Connect wearable — không cần data y tế</div>
+                            <div class="jt-desc">5,200 bước hôm nay. Data wearable là tham khảo — không phải y tế. KHÔNG cần BS duyệt.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-user)">👤 User · Streak</div>
+                            <div class="jt-title">Streak 21 ngày đi bộ → Cây Sả Lv.6</div>
+                            <div class="jt-desc">+210 ⓕ. Chồng thấy: "Vợ ơi cây Sả xanh quá!". Family social loop tự nhiên.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-ai">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:var(--role-ai)">🤖 AI · Gợi ý khám</div>
+                            <div class="jt-title">Nhắc khám hậu sản — theo lịch BS set</div>
+                            <div class="jt-desc">AI nhắc: "BS hẹn khám hậu sản 6 tháng". Không tự đặt lịch — chỉ nhắc theo chỉ định BS.</div>
+                        </div>
+                    </div>
+
+                    <div class="jt-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg></div>
+
+                    <div class="jt-step jt-role-user">
+                        <div class="jt-dot"></div>
+                        <div class="jt-card">
+                            <div class="jt-role" style="color:#16A34A">✅ Outcome</div>
+                            <div class="jt-title">Từ Sen → Sả — hành trình sức khỏe liên tục, không đứt đoạn</div>
+                            <div class="jt-desc">Chị Vân từ thai sản → phục hồi → lifestyle. Long Châu đồng hành xuyên suốt các giai đoạn cuộc đời. CLV vô hạn.</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== VIEW 3: ISOMETRIC GARDEN ===== -->
+    <div id="view-garden" class="view-content">
+
+        <!-- HERO: Parallax Garden Island -->
+        <div class="bg-white rounded-3xl shadow-xl overflow-hidden mb-8 border border-gray-100 relative">
+            <div class="p-6 bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 border-b border-gray-100">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-3xl">🌿</span>
+                    <h2 class="text-2xl font-extrabold text-gray-900">Khu Vườn Sức Khỏe Việt</h2>
+                </div>
+                <p class="text-gray-600">"Vun cây mỗi ngày — sức khỏe nở hoa." Mỗi cây đại diện một hành trình. Cây càng lớn = tuân thủ càng cao.</p>
+            </div>
+            <div class="parallax-container" id="hero-parallax">
+                <img src="family_garden_scene.png" alt="Khu Vườn Sức Khỏe Việt" class="parallax-image w-full max-h-[520px] object-contain bg-gradient-to-b from-blue-50/50 to-green-50/50 p-6" id="hero-image">
+            </div>
+            <!-- Garden Stats Bar -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-gray-50/50 border-t border-gray-100">
+                <div class="garden-stat">
+                    <div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">Số cây</div>
+                    <div class="stat-value count-animate" id="stat-trees">7</div>
+                    <div class="text-xs text-gray-400 mt-1">7/7 đã kích hoạt</div>
+                </div>
+                <div class="garden-stat">
+                    <div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">Tổng Level</div>
+                    <div class="stat-value count-animate" id="stat-level">40</div>
+                    <div class="text-xs text-gray-400 mt-1">Gừng Lv.12 cao nhất</div>
+                </div>
+                <div class="garden-stat">
+                    <div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">Streak</div>
+                    <div class="stat-value count-animate" id="stat-streak">14</div>
+                    <div class="text-xs text-gray-400 mt-1">🔥 14 ngày liên tiếp</div>
+                </div>
+                <div class="garden-stat">
+                    <div class="text-xs text-gray-500 uppercase font-semibold tracking-wide">Gia đình</div>
+                    <div class="stat-value count-animate" id="stat-family">4</div>
+                    <div class="text-xs text-gray-400 mt-1">Cô Mai · 4 thành viên</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7 Plant Cards — Garden Bed Layout -->
+        <div class="bg-white rounded-3xl p-8 shadow-lg border border-gray-100 mb-8">
+            <h3 class="text-xl font-extrabold text-gray-900 mb-2">🌱 7 Cây Thảo Dược</h3>
+            <p class="text-gray-500 text-sm mb-6">Click vào từng cây để xem chi tiết hành trình. Cây đang active có hiệu ứng glow.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-5" id="garden-grid"></div>
+        </div>
+
+        <!-- Garden Growth Journey Timeline -->
+        <div class="bg-white rounded-3xl shadow-xl overflow-hidden mb-8 border border-gray-100 relative">
+            <div class="p-6 bg-gradient-to-r from-amber-50 via-green-50 to-emerald-50 border-b border-gray-100">
+                <h3 class="text-xl font-extrabold text-gray-900">🌳 Hành trình phát triển vườn</h3>
+                <p class="text-gray-500 text-sm mt-1">Theo dõi sự phát triển của Khu Vườn qua từng mốc thời gian. Hover để xem chi tiết.</p>
+            </div>
+            <div style="background: url('garden_plants_set.png') center/cover no-repeat; background-size: 90%; opacity: 0.06; position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none;"></div>
+            <div class="garden-timeline relative" id="garden-timeline">
+                <!-- JS will populate -->
+            </div>
+        </div>
+
+        <!-- Plant detail panel -->
+        <div id="plant-detail" class="hidden bg-white rounded-3xl p-8 shadow-lg border-2 border-emerald-200 mb-8 transition-all">
+            <div class="flex items-start gap-6">
+                <div id="pd-icon" class="text-6xl"></div>
+                <div class="flex-1">
+                    <h3 id="pd-name" class="text-2xl font-extrabold text-gray-900"></h3>
+                    <p id="pd-journey" class="text-sm font-bold mt-1"></p>
+                    <p id="pd-desc" class="text-gray-600 mt-3"></p>
+                    <div id="pd-features" class="mt-4 grid grid-cols-3 gap-3"></div>
+                </div>
+                <button onclick="document.getElementById('plant-detail').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+        </div>
+
+        <!-- TRELLIS.2 Reference — Reframed -->
+        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-3xl p-8 shadow-lg border border-indigo-100">
+            <div class="flex items-start gap-4">
+                <div class="text-4xl">🔬</div>
+                <div>
+                    <h3 class="text-lg font-extrabold text-gray-900 mb-2">Từ 2D Isometric → 3D GLB Assets</h3>
+                    <p class="text-gray-600 text-sm mb-3">Demo hiện tại sử dụng <strong>2D isometric illustration</strong> (AI-generated). Trong production, mỗi cây thảo dược sẽ được render dưới dạng <strong>3D GLB asset</strong> bằng <a href="https://github.com/microsoft/TRELLIS.2" target="_blank" class="text-indigo-600 underline font-bold">Microsoft TRELLIS.2</a> — 4B parameter model với O-Voxel representation. User có thể xoay/zoom từng cây trong app, với PBR materials (Base Color, Roughness, Metallic, Opacity) cho hiệu ứng chân thực.</p>
+                    <div class="flex gap-3 flex-wrap">
+                        <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold">O-Voxel Representation</span>
+                        <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">Sparse 3D VAE</span>
+                        <span class="px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-xs font-bold">PBR Materials</span>
+                        <span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">GLB Export</span>
+                        <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">4B Parameters</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <div class="bg-white rounded-3xl p-8 mt-12 shadow-lg border border-blue-100">
+        <h2 class="text-2xl font-extrabold text-gray-900 mb-4">🛡 Nguyên tắc đạo đức y khoa cốt lõi của Long Châu Care</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+            <div class="p-5 rounded-2xl bg-purple-50 border border-purple-100">
+                <div class="text-3xl mb-2">🩺</div>
+                <h3 class="font-bold text-gray-900 mb-2">BS là nguồn chẩn đoán duy nhất</h3>
+                <p class="text-sm text-gray-600">Mọi bệnh lý trong Long Châu Care đều dẫn nguồn về <strong>BS có chứng chỉ</strong>. AI không tự nghĩ ra bệnh.</p>
+            </div>
+            <div class="p-5 rounded-2xl bg-cyan-50 border border-cyan-100">
+                <div class="text-3xl mb-2">💊</div>
+                <h3 class="font-bold text-gray-900 mb-2">Dược sĩ là cổng kiểm duyệt</h3>
+                <p class="text-sm text-gray-600">Mọi message y tế đến user PHẢI có DS Long Châu duyệt. Audit log đầy đủ — compliance Bộ Y tế.</p>
+            </div>
+            <div class="p-5 rounded-2xl bg-indigo-50 border border-indigo-100">
+                <div class="text-3xl mb-2">🤖</div>
+                <h3 class="font-bold text-gray-900 mb-2">AI chỉ làm việc hành chính</h3>
+                <p class="text-sm text-gray-600">AI nhắc lịch, tổng hợp chỉ số, flag pattern. <strong>AI KHÔNG chẩn đoán, KHÔNG kê đơn, KHÔNG đổi phác đồ.</strong></p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    lucide.createIcons();
+
+    function switchView(viewId, btn) {
+        document.querySelectorAll('.view-content').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+        document.getElementById('view-' + viewId).classList.add('active');
+        btn.classList.add('active');
+        if (viewId === 'garden' && !window._gardenInit) initGarden();
+    }
+
+    // Plant data — when individual PNGs are generated, add `image: 'plant_xxx.png'` field
+    const plants = [
+        { id:'gung', image:'plant_gung.png', name:'Cây Gừng', journey:'Điều trị', color:'#C44545', level:12, streak:true, desc:'Dành cho khách hàng đang điều trị bệnh mãn tính theo đơn BS. Nhắc uống thuốc, đo chỉ số, refill đơn.', features:['Nhắc thuốc 6h sáng','Đo HA 2 ngày/lần','Refill đơn 30 ngày'] },
+        { id:'nghe', image:'plant_nghe.png', name:'Cây Nghệ', journey:'Theo dõi', color:'#B45309', level:4, streak:false, desc:'Dành cho khách hàng có chỉ số cần theo dõi (tiền tiểu đường, tiền tăng HA). BS đã chỉ định lộ trình.', features:['Đo đường huyết CN','Log cân nặng T2','Lab lại sau 3 tháng'] },
+        { id:'rauma', image:'plant_rauma.png', name:'Rau Má', journey:'Phòng ngừa', color:'#166534', level:5, streak:true, desc:'Dành cho khách hàng khỏe mạnh, muốn tầm soát phòng ngừa. Có yếu tố gia đình cần lưu ý.', features:['Tầm soát theo BYT','Khám tổng quát','Lịch sử gia đình'] },
+        { id:'tiato', image:'plant_tiato.png', name:'Tía Tô', journey:'Nhi khoa', color:'#9D174D', level:3, streak:false, desc:'Dành cho trẻ em. Theo dõi lịch tiêm chủng CDC, mốc phát triển, dinh dưỡng.', features:['Tiêm chủng CDC','Mốc phát triển','Dinh dưỡng trẻ'] },
+        { id:'tra', image:'plant_tra.png', name:'Cây Trà', journey:'Lifestyle', color:'#1E40AF', level:8, streak:true, desc:'Dành cho người trẻ khỏe, wellness-focused. Không cần data y tế, chỉ cần habits.', features:['5,000 bước/ngày','Ngủ trước 23h','2L nước/ngày'] },
+        { id:'sen', image:'plant_sen.png', name:'Hoa Sen', journey:'Thai sản', color:'#9D174D', level:2, streak:false, desc:'Hành trình có thời hạn ~9 tháng. Khám thai định kỳ, vitamin, siêu âm mốc. Tốt nghiệp → auto tạo Sả + Tía tô.', features:['Khám thai 4 tuần/lần','Acid Folic + Sắt','SA mốc 12-22-32'] },
+        { id:'sa', image:'plant_sa.png', name:'Cây Sả', journey:'Vận động', color:'#065F46', level:6, streak:true, desc:'Phục hồi sau sinh hoặc vận động wellness. Auto chuyển từ Sen graduation.', features:['Đi bộ 5,000 bước','Yoga 15 phút','Phục hồi sau sinh'] }
+    ];
+
+    // Timeline milestones
+    const milestones = [
+        { week:'Tuần 1', icon:'🌱', label:'Seed', title:'Tạo vườn', detail:'Trà Lv.1', reached:true },
+        { week:'Tuần 4', icon:'🌿', label:'Sprout', title:'+2 cây mới', detail:'Gừng, Nghệ', reached:true },
+        { week:'Tuần 8', icon:'🌳', label:'Growing', title:'Lv.5+', detail:'Streak 14 ngày', reached:true },
+        { week:'Tuần 12', icon:'🌸', label:'Bloom', title:'7 cây active', detail:'Milestone!', reached:true },
+        { week:'Hiện tại', icon:'🏡', label:'Garden', title:'Khu vườn', detail:'Tổng Lv.40', reached:true }
+    ];
+
+    // ===== INIT GARDEN =====
+    function initGarden() {
+        window._gardenInit = true;
+        const grid = document.getElementById('garden-grid');
+        plants.forEach((p, i) => {
+            const card = document.createElement('div');
+            const isActive = p.streak;
+            const statusClass = isActive ? 'active-plant' : 'paused-plant';
+            card.className = `plant-bed-card ${statusClass}`;
+            card.style.animationDelay = i * 80 + 'ms';
+            card.style.setProperty('--plant-color', p.color);
+
+            const progress = Math.min(p.level / 15 * 100, 100);
+
+            card.innerHTML = `
+                <div class="relative inline-flex items-center justify-center mb-3">
+                    <svg width="86" height="86" viewBox="0 0 86 86" class="absolute progress-ring" style="top:-11px;left:-11px;">
+                        <circle class="progress-ring-bg" cx="43" cy="43" r="33"/>
+                        <circle class="progress-ring-fill" cx="43" cy="43" r="33"
+                            stroke="${p.color}" stroke-dasharray="${2 * Math.PI * 33}" stroke-dashoffset="${(2 * Math.PI * 33) - (progress / 100) * (2 * Math.PI * 33)}"
+                            style="transition: stroke-dashoffset 1.8s cubic-bezier(0.4,0,0.2,1);"/>
+                    </svg>
+                    <img src="${p.image}" alt="${p.name}" class="plant-icon-glow" style="width:64px;height:64px;object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.15));">
+                </div>
+                <h4 class="font-extrabold text-gray-900 text-sm">${p.name}</h4>
+                <p class="text-xs font-bold mt-1" style="color:${p.color}">${p.journey}</p>
+                <div class="mt-2">
+                    <span class="level-badge" style="border-color:${p.color};color:${p.color};">
+                        Lv.${p.level}
+                    </span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-1.5 mt-2">
+                    <div class="h-1.5 rounded-full transition-all duration-1000" style="width:${progress}%;background:${p.color};"></div>
+                </div>`;
+            card.onclick = (e) => {
+                showPlantDetail(p);
+                spawnSparkles(card);
+                // Trigger dramatic sway on click
+                const img = card.querySelector('.plant-icon-glow');
+                if (img) {
+                    img.classList.add('plant-sway-click');
+                    setTimeout(() => img.classList.remove('plant-sway-click'), 1200);
+                }
+            };
+            // Double-click to water
+            card.ondblclick = (e) => { e.stopPropagation(); waterPlant(card); };
+            grid.appendChild(card);
+        });
+
+        // Init parallax on hero image
+        initParallax();
+        // Populate garden timeline
+        initTimeline();
+        // Animate stat counters
+        animateStats();
+    }
+
+    // ===== PARALLAX HERO =====
+    function initParallax() {
+        const container = document.getElementById('hero-parallax');
+        const img = document.getElementById('hero-image');
+        if (!container || !img) return;
+        container.addEventListener('mousemove', function(e) {
+            const rect = container.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width - 0.5;
+            const y = (e.clientY - rect.top) / rect.height - 0.5;
+            img.style.transform = `perspective(1000px) rotateY(${x * 8}deg) rotateX(${-y * 6}deg) scale(1.03)`;
+        });
+        container.addEventListener('mouseleave', function() {
+            img.style.transform = 'perspective(1000px) rotateY(0deg) rotateX(0deg) scale(1)';
+        });
+    }
+
+    // ===== GARDEN TIMELINE =====
+    function initTimeline() {
+        const tl = document.getElementById('garden-timeline');
+        if (!tl) return;
+        milestones.forEach((m, i) => {
+            const el = document.createElement('div');
+            el.className = 'gt-milestone' + (m.reached ? ' reached' : '');
+            el.innerHTML = `
+                <div class="gt-tooltip">${m.detail}</div>
+                <div class="gt-dot"></div>
+                <span class="gt-plant-icon">${m.icon}</span>
+                <div class="gt-card">
+                    <div class="text-xs font-bold text-gray-400 uppercase tracking-wide">${m.week}</div>
+                    <div class="text-sm font-extrabold text-gray-900 mt-0.5">${m.title}</div>
+                    <div class="text-xs text-gray-500 mt-0.5">${m.label}</div>
+                </div>`;
+            tl.appendChild(el);
+        });
+    }
+
+    // ===== SHOW PLANT DETAIL =====
+    function showPlantDetail(p) {
+        const el = document.getElementById('plant-detail');
+        el.classList.remove('hidden');
+        el.classList.add('slide-up');
+        setTimeout(() => el.classList.remove('slide-up'), 500);
+        document.getElementById('pd-icon').innerHTML = `<img src="${p.image}" alt="${p.name}" style="width:80px;height:80px;object-fit:contain;">`;
+        document.getElementById('pd-name').textContent = p.name + ' — Lv.' + p.level;
+        const pj = document.getElementById('pd-journey');
+        pj.textContent = '🏷️ Hành trình ' + p.journey;
+        pj.style.color = p.color;
+        document.getElementById('pd-desc').textContent = p.desc;
+        const ft = document.getElementById('pd-features');
+        ft.innerHTML = p.features.map(f => `<div class="bg-gray-50 rounded-lg p-3 text-center"><span class="text-xs text-gray-700">✅ ${f}</span></div>`).join('');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // ===== SPARKLE PARTICLES =====
+    function spawnSparkles(el) {
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        for (let i = 0; i < 8; i++) {
+            const spark = document.createElement('div');
+            spark.className = 'sparkle-particle';
+            spark.style.left = cx + 'px';
+            spark.style.top = cy + 'px';
+            spark.style.setProperty('--sx', (Math.random() - 0.5) * 60 + 'px');
+            spark.style.setProperty('--sy', (Math.random() - 0.5) * 60 + 'px');
+            spark.style.animationDelay = i * 0.08 + 's';
+            document.body.appendChild(spark);
+            setTimeout(() => spark.remove(), 1100);
+        }
+    }
+
+    // ===== WATER DROP =====
+    function waterPlant(el) {
+        const rect = el.getBoundingClientRect();
+        for (let i = 0; i < 5; i++) {
+            const drop = document.createElement('div');
+            drop.className = 'water-drop';
+            drop.style.position = 'fixed';
+            drop.style.left = (rect.left + rect.width * 0.3 + Math.random() * rect.width * 0.4) + 'px';
+            drop.style.top = (rect.top + 10) + 'px';
+            drop.style.animationDelay = i * 0.15 + 's';
+            document.body.appendChild(drop);
+            setTimeout(() => drop.remove(), 1200);
+        }
+        // Brief glow on the card
+        el.style.boxShadow = '0 0 24px rgba(59, 130, 246, 0.6)';
+        setTimeout(() => { el.style.boxShadow = ''; }, 800);
+    }
+
+    // ===== COUNTER ANIMATION =====
+    function animateStats() {
+        const targets = [
+            { id: 'stat-trees', value: 7 },
+            { id: 'stat-level', value: 40 },
+            { id: 'stat-streak', value: 14 },
+            { id: 'stat-family', value: 4 }
+        ];
+        targets.forEach(({ id, value }) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const duration = 1200;
+            const start = performance.now();
+            function step(ts) {
+                const progress = Math.min((ts - start) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                el.textContent = Math.round(eased * value);
+                if (progress < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        });
+    }
+</script>
+
+</body>
+</html>

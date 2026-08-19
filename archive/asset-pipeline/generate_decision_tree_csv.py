@@ -1,0 +1,994 @@
+"""Generate LC_Care decision-tree / full-logic CSV for Google Sheets.
+
+KIỂM CHỨNG: Script này đã được cross-reference với TOÀN BỘ source code thực tế:
+  - backend/services/onboarding/service.py (assign_plant, OnboardingService.submit)
+  - backend/services/auth/service.py (AuthService.login)
+  - backend/services/garden/service.py (water_plant, streak, stage, badges)
+  - backend/services/family/service.py (invite, join, water_for_member)
+  - backend/services/voucher/service.py (whitelist, targeted, redeem)
+  - backend/services/pharmacist/service.py (queue, approve, reject, SLA)
+  - backend/services/careplan/service.py (generate_habits, update_habit, add_custom)
+  - backend/services/notification/service.py (rate limit, templates, push)
+  - backend/services/upload/service.py + models.py (OCR, DocType)
+  - backend/services/fitness/service.py (OAuth, sync, token refresh)
+  - backend/services/adherence/cross_check.py (validate_user)
+  - backend/ai/guardrails.py (3 lớp: BANNED_PATTERNS, DISCLAIMERS, BANNED_EXACT)
+  - backend/ai/client.py (DeepSeek primary, Gemini fallback)
+  - backend/middleware/auth.py (get_current_user)
+  - backend/shared/validation.py (all enums + constants)
+  - backend/scheduler/router.py (daily-reminders, weekly-insights, refill-check, sla)
+  - backend/main.py (all API routes)
+  - frontend/src/config/plantAssignment.js (assignPlant - priority order)
+  - frontend/src/config/achievements.js (8 badges)
+  - frontend/src/context/AppContext.jsx (initializeApp routing)
+  - plan_v3.md (business model, edge cases)
+"""
+import csv
+import os
+
+HEADER = ["STT", "Nhóm / Cây quyết định", "Điều kiện / Trigger",
+          "Kết quả / Hành động", "Tham số / Giá trị",
+          "Guardrail / Edge case / Ghi chú", "File nguồn (kiểm chứng)"]
+
+rows = []
+
+
+def SECTION(title, subtitle=""):
+    """Insert a visual section header."""
+    rows.append(["", "", "", "", "", "", ""])
+    rows.append(["", f"████  {title}", subtitle, "", "", "", ""])
+
+
+def R(*cols):
+    """Append one row, padding to 7 columns."""
+    cols = list(cols) + [""] * (7 - len(cols))
+    rows.append(cols[:7])
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# COVER
+# ════════════════════════════════════════════════════════════════════════════
+R("", "LONG CHÂU CARE — CÂY QUYẾT ĐỊNH & FULL LOGIC (BUSINESS → RULE)",
+  "Tài liệu sinh tự động — ĐÃ KIỂM CHỨNG từ source code thực tế", "",
+  f"Ngày tạo: 2026-06-03",
+  "Mỗi dòng = 1 nhánh quyết định / 1 rule. STT = thứ tự ưu tiên đánh giá.", "")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MỤC LỤC
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("MỤC LỤC")
+toc = [
+    "00. Triết lý & Vai trò (AI phụ - Dược sĩ chính) — Rule #0",
+    "01. Auth & Phân quyền",
+    "02. Onboarding flow + Validation",
+    "03. CÂY QUYẾT ĐỊNH: Gán cây (Plant Assignment) — Backend",
+    "04. CÂY QUYẾT ĐỊNH: Gán cây (Plant Assignment) — Frontend",
+    "05. Bảng 15 nhóm cây + Disease→Plant",
+    "06. CÂY QUYẾT ĐỊNH: Auto-approve vs Dược sĩ duyệt",
+    "07. Care Plan & Sinh Habit (AI)",
+    "08. Garden: Tưới cây / Streak / Stage",
+    "09. Family Garden & Tưới hộ",
+    "10. Notification & Rate limit",
+    "11. Voucher & Loyalty (Guardrail #4)",
+    "12. Pharmacist Dashboard & SLA",
+    "13. Scheduler / Cron jobs",
+    "14. AI Guardrails (Rule #0) — 3 lớp",
+    "15. Health Tracking (Google Fit)",
+    "16. OCR / Upload",
+    "17. Adherence Cross-check",
+    "18. Achievements / Badges",
+    "19. Business Model / LTV / Moat",
+    "20. Edge cases & Error handling",
+    "21. Firestore data model",
+    "22. API endpoints map",
+    "23. Demo flow (5 bước Wow)",
+    "24. Bug / Inconsistency phát hiện (kiểm chứng)",
+]
+for i, t in enumerate(toc):
+    R(f"{i:02d}", t)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 00 TRIẾT LÝ
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("00. TRIẾT LÝ & VAI TRÒ — RULE #0 (nền tảng pháp lý)")
+R("1", "Vai trò AI", "Mọi output AI",
+  "AI = Secondary Actor (trợ lý hành chính). Gom dữ liệu, tạo bản tóm tắt.",
+  "KHÔNG phải chatbot y tế",
+  "Người dùng cuối KHÔNG thấy output thô — phải qua DS duyệt",
+  "ai/prompts/system_prompt.txt")
+R("2", "Vai trò Dược sĩ", "Phê duyệt kế hoạch",
+  "DS = Primary Liable (chịu trách nhiệm chính, ký duyệt).",
+  "5-10 DS chuyên trách (Care Team)",
+  "Human-in-the-loop bắt buộc cho nhóm medical",
+  "pharmacist/service.py")
+R("3", "Rule #0", "AI sinh nội dung",
+  "CẤM: chẩn đoán, suy bệnh từ thuốc, kê đơn, đề xuất cây thảo dược.",
+  "Banned words: bệnh nhân, chẩn đoán, điều trị bệnh, mắc/bị bệnh, phác đồ",
+  "Validate qua guardrails.py 3 lớp + audit log",
+  "ai/guardrails.py (L6-L41)")
+R("4", "Từ thay thế an toàn", "Khi mô tả tình trạng",
+  "'bị tăng huyết áp' → 'đang dùng thuốc tim mạch'; 'bệnh nhân' → 'khách hàng'; 'điều trị' → 'chăm sóc sức khỏe'",
+  "", "Bảng substitution trong system_prompt", "ai/prompts/system_prompt.txt")
+R("5", "Output rule", "Mọi AI output",
+  "Phải kết thúc: '📋 Dược sĩ sẽ xem xét và đưa ra quyết định cuối cùng.'",
+  "Gắn tag nguồn: [OCR] [lịch sử mua] [tự khai] [lab]",
+  "Thiếu disclaimer DS → bị reject (MISSING_DISCLAIMER)",
+  "ai/guardrails.py L30-L33")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 01 AUTH
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("01. AUTH & PHÂN QUYỀN")
+R("1", "Đăng nhập", "POST /api/auth/login (phone, fullName)",
+  "Chuẩn hóa số: ''.join(filter(str.isdigit, phone)). Tạo user nếu chưa có.",
+  "uid = '{role}_{clean_phone}'",
+  "Số rỗng → ValueError",
+  "auth/service.py L18-L19")
+R("2", "Phân vai trò", "clean_phone ∈ PHARMACIST_PHONES",
+  "role = 'pharmacist', else 'user'",
+  'PHARMACIST_PHONES = {"0999999999", "0988888888"}',
+  "Hardcode cho demo",
+  "auth/service.py L8")
+R("3", "Token", "Sau login",
+  "Firebase custom token (Admin SDK), hiệu lực 1 giờ.",
+  "auth.create_custom_token(uid)",
+  "Frontend đổi lấy ID token qua Firebase Auth Client",
+  "auth/service.py L56")
+R("4", "Middleware", "Mọi request có Authorization",
+  "Verify Firebase ID token → uid. Token demo (user_/pharmacist_/demo_user_) → bypass.",
+  "ENV=production + no token → 401",
+  "Fallback 'demo_user_mai' khi không prod",
+  "middleware/auth.py L10-L20")
+R("5", "Routing app", "initializeApp(role)",
+  "role=pharmacist → screen 'pharmacist'; user có plant → 'home'; else 'welcome'",
+  "setScreenStack",
+  "Kiểm tra hasPlant = !!(safeGarden.carePlan || safeGarden.plant)",
+  "context/AppContext.jsx L169-L246")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 02 ONBOARDING
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("02. ONBOARDING FLOW + VALIDATION", "POST /api/onboarding/submit")
+R("1", "Required fields", "Validate userProfile payload",
+  "Bắt buộc: fullName, gender, yearOfBirth, careFor, healthStatus",
+  "Thiếu → ValueError (router validation)",
+  "Pydantic / manual check",
+  "onboarding/router.py")
+R("2", "Sanitize healthStatus", "healthStatus không ∈ HEALTH_STATUS",
+  "→ fallback 'healthy'",
+  'HEALTH_STATUS = {"healthy", "monitoring", "chronic", "mental", "pregnant", "recovery"}',
+  "6 giá trị hợp lệ",
+  "onboarding/service.py L172-L174 + shared/validation.py L6")
+R("3", "Sanitize gender", "gender không ∈ GENDERS",
+  "→ 'unknown'",
+  'GENDERS = {"male", "female"}',
+  "",
+  "onboarding/service.py L176-L178 + shared/validation.py L4")
+R("4", "Sanitize yearOfBirth", "yearOfBirth ngoài 1900..2016",
+  "→ 1990",
+  "YEAR_MIN=1900, YEAR_MAX=2016",
+  "Lỗi parse (ValueError/TypeError) → 1990",
+  "onboarding/service.py L180-L186 + shared/validation.py L22-L23")
+R("5", "Sanitize lists", "chronicSubConditions / badHabits / lifeChanges",
+  "Lọc bỏ giá trị không ∈ enum tương ứng",
+  'CHRONIC_SUB = {"diabetes", "hypertension", "cholesterol", "bone_joint", "digestive"}',
+  'BAD_HABITS = {"latenight", "alcohol", "unhealthy_eating", "stress", "smoking", "skip_meals", "sleep_late", "ok"}',
+  "onboarding/service.py L189-L191 + shared/validation.py L7-L10")
+R("6", "Lưu profile", "Sau sanitize",
+  "users/{uid}/profile/info (merge=True)",
+  "Thêm createdAt ISO",
+  "",
+  "onboarding/service.py L194-L197")
+R("7", "Health conditions", "healthStatus='chronic' AND subs có phần tử",
+  "Tạo healthConditions/cond-{i+1} với source='self_report'",
+  "Mỗi sub → 1 document",
+  "",
+  "onboarding/service.py L200-L208")
+R("8", "Chọn cây — ưu tiên user", "assignedPlants.primary.group hợp lệ",
+  "Dùng lựa chọn của user; else → assign_plant(profile)",
+  "Kiểm tra chosen_group in PLANT_GROUPS",
+  "Xem CÂY QUYẾT ĐỊNH mục 03",
+  "onboarding/service.py L211-L219")
+R("9", "Tạo care plan", "Sau gán cây",
+  "carePlans/plan-1: plantStatus, habits, pharmacistApproved, needsPharmacist...",
+  "status='growing' nếu auto, 'pending' nếu cần DS",
+  "habitSource='ai_generated' nếu auto, 'pending_pharmacist' nếu cần DS",
+  "onboarding/service.py L229-L247")
+R("10", "AI summary", "Luôn",
+  "Sinh customer_summary qua AI; validate guardrails; fallback text nếu unsafe",
+  "Lưu vào plan-1.aiSummary",
+  "AI fail → fallback hardcode text kèm emoji",
+  "onboarding/service.py L320-L365")
+R("11", "Init loyalty", "Nếu chưa có",
+  "loyaltySummary/info = {totalPoints:0, familyPoints:0, tier:'Bronze', voucherHistory:[]}",
+  "loyalty_ref.get().exists check",
+  "",
+  "onboarding/service.py L383-L390")
+R("12", "Pharmacist queue", "needsPharmacist=true",
+  "pharmacistQueue/draft-{uid}: status=pending, priority=medium, kèm aiSummary",
+  "Kèm healthStatus, chronicSubConditions",
+  "",
+  "onboarding/service.py L368-L380")
+R("13", "Audit", "Kết thúc",
+  "medical_audit_log: action='onboarding_completed'",
+  "Kèm assignedPlant, needsPharmacist",
+  "Immutable log",
+  "onboarding/service.py L393-L399")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 03 PLANT ASSIGNMENT — BACKEND
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("03. CÂY QUYẾT ĐỊNH — GÁN CÂY BACKEND (assign_plant)",
+        "Đánh giá theo thứ tự, dừng ở nhánh khớp đầu tiên")
+R("", "THỨ TỰ ƯU TIÊN BACKEND",
+  "age = datetime.now().year - int(profile.get('yearOfBirth', 1990))",
+  "Tuần tự: Medical → Age → Pregnant → Lifestyle → Default",
+  "", "⚠ Thứ tự khác Frontend (xem mục 04)",
+  "onboarding/service.py L120-L161")
+R("1", "Nhánh 1: Mãn tính có sub",
+  "health='chronic' AND subs≥1",
+  "DISEASE_TO_PLANT[subs[0]] (default bittermelon). Map plant→group.",
+  "Không khớp group → G3 (Khổ Qua)",
+  "Medical → cần DS",
+  "onboarding/service.py L129-L136")
+R("2", "Nhánh 2: Tinh thần",
+  "health='mental'",
+  "G8 — Oải Hương (lavender)",
+  "needsPharmacist=true",
+  "",
+  "onboarding/service.py L138-L139")
+R("3", "Nhánh 3: Hồi phục",
+  "health='recovery'",
+  "G7 — Nghệ (turmeric)",
+  "needsPharmacist=true",
+  "",
+  "onboarding/service.py L140-L141")
+R("4", "Nhánh 4: Theo dõi",
+  "health='monitoring'",
+  "G2 — Gừng (ginger)",
+  "needsPharmacist=true",
+  "",
+  "onboarding/service.py L142-L143")
+R("5", "Nhánh 5: Trẻ em",
+  "age < 18",
+  "G5 — Húng Quế (basil)",
+  "needsPharmacist=false",
+  "⚠ Backend check tuổi TRƯỚC pregnant",
+  "onboarding/service.py L146-L147")
+R("6", "Nhánh 6: Cao tuổi",
+  "age ≥ 60",
+  "G6 — Lô Hội (aloe)",
+  "needsPharmacist=false",
+  "",
+  "onboarding/service.py L148-L149")
+R("7", "Nhánh 7: Mang thai",
+  "health='pregnant'",
+  "G4 — Sen (lotus)",
+  "needsPharmacist=false",
+  "⚠ Backend check pregnant SAU tuổi",
+  "onboarding/service.py L150-L151")
+R("8", "Nhánh 8: Vận động",
+  "exercise='active'",
+  "G9 — Nhân Sâm (ginseng)",
+  "needsPharmacist=false",
+  "",
+  "onboarding/service.py L154-L155")
+R("9", "Nhánh 9: Gia đình",
+  "careFor='family'",
+  "G11 — Cam Thảo (licorice)",
+  "needsPharmacist=false",
+  "",
+  "onboarding/service.py L156-L157")
+R("10", "Nhánh 10: Ít vận động",
+  "exercise='sedentary'",
+  "G10 — Rau Má (pennywort)",
+  "needsPharmacist=false",
+  "",
+  "onboarding/service.py L158-L159")
+R("11", "Nhánh 11: Mặc định",
+  "Không khớp nhánh nào",
+  "G1 — Bạc Hà (mint)",
+  "needsPharmacist=false",
+  "Mặc định nền tảng",
+  "onboarding/service.py L161")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 04 PLANT ASSIGNMENT — FRONTEND
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("04. CÂY QUYẾT ĐỊNH — GÁN CÂY FRONTEND (assignPlant)",
+        "THỨ TỰ KHÁC BACKEND — pregnant ƯU TIÊN trước tuổi")
+R("", "THỨ TỰ ƯU TIÊN FRONTEND",
+  "age = new Date().getFullYear() - (yearOfBirth || 1990)",
+  "Tuần tự: Medical → chronic (no subs) → Pregnant → Age → Lifestyle → Default",
+  "", "⚠ Frontend có thêm nhánh 'chronic without subs' → G3",
+  "plantAssignment.js L43-L78")
+R("1", "Nhánh 1: chronic + subs",
+  "healthStatus='chronic' && subs.length > 0",
+  "DISEASE_TO_PLANT[subs[0]] || 'bittermelon' → findGroupByPlant()",
+  "Fallback G3",
+  "Giống backend",
+  "plantAssignment.js L49-L51")
+R("2", "Nhánh 2: chronic (no subs)",
+  "healthStatus='chronic' (không có subs)",
+  "G3 — Khổ Qua (bittermelon)",
+  "",
+  "⚠ Backend KHÔNG có nhánh này (backend chỉ check chronic+subs)",
+  "plantAssignment.js L53-L54")
+R("3", "Nhánh 3: mental",
+  "healthStatus='mental'",
+  "G8 — Oải Hương",
+  "", "Giống backend", "plantAssignment.js L56-L57")
+R("4", "Nhánh 4: recovery",
+  "healthStatus='recovery'",
+  "G7 — Nghệ",
+  "", "Giống backend", "plantAssignment.js L59-L60")
+R("5", "Nhánh 5: monitoring",
+  "healthStatus='monitoring'",
+  "G2 — Gừng",
+  "", "Giống backend", "plantAssignment.js L62-L63")
+R("6", "Nhánh 6: Mang thai ★",
+  "healthStatus='pregnant'",
+  "G4 — Sen (lotus)",
+  "",
+  "⚠ Frontend check pregnant TRƯỚC tuổi (khác backend)",
+  "plantAssignment.js L67")
+R("7", "Nhánh 7: Trẻ em",
+  "age < 18",
+  "G5 — Húng Quế (basil)",
+  "",
+  "Frontend check tuổi SAU pregnant",
+  "plantAssignment.js L68")
+R("8", "Nhánh 8: Cao tuổi",
+  "age ≥ 60",
+  "G6 — Lô Hội (aloe)",
+  "", "", "plantAssignment.js L69")
+R("9-11", "Lifestyle + Default",
+  "exercise='active' → G9; careFor='family' → G11; exercise='sedentary' → G10; else G1",
+  "Giống backend",
+  "", "", "plantAssignment.js L72-L77")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 05 PLANT TABLE
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("05. BẢNG 15 NHÓM CÂY + DISEASE → PLANT")
+plants = [
+    ("G1", "mint", "Bạc Hà", "🌿", "KHÔNG", "Sức khỏe nền tảng", "#10B981"),
+    ("G2", "ginger", "Gừng", "🫚", "CẦN DS", "Huyết áp / theo dõi chỉ số", "#00923F"),
+    ("G3", "bittermelon", "Khổ Qua", "🥒", "CẦN DS", "Tiểu đường", "#65A30D"),
+    ("G4", "lotus", "Sen", "🪷", "KHÔNG", "Thai sản", "#DB2777"),
+    ("G5", "basil", "Húng Quế", "🌿", "KHÔNG", "Thanh thiếu niên / dinh dưỡng", "#F59E0B"),
+    ("G6", "aloe", "Lô Hội", "🪴", "KHÔNG", "Người cao tuổi 60+", "#059669"),
+    ("G7", "turmeric", "Nghệ", "🟡", "CẦN DS", "Phục hồi / chống viêm", "#D97706"),
+    ("G8", "lavender", "Oải Hương", "🪻", "CẦN DS", "Thần kinh / mất ngủ", "#7C3AED"),
+    ("G9", "ginseng", "Nhân Sâm", "🥔", "KHÔNG", "Người trẻ vận động", "#9CA3AF"),
+    ("G10", "pennywort", "Rau Má", "🌾", "KHÔNG", "Ít vận động / phòng ngừa", "#0284C7"),
+    ("G11", "licorice", "Cam Thảo", "🌿", "KHÔNG", "Caregiver chăm người thân", "#B45309"),
+    ("G12", "lemongrass", "Sả", "🌿", "KHÔNG", "Phòng ngừa / đề kháng", "#4A8A40"),
+    ("G13", "eucommia", "Đỗ Trọng", "🌳", "CẦN DS", "Xương khớp", "#8B5CF6"),
+    ("G14", "phyllanthus", "Diệp Hạ Châu", "🌿", "CẦN DS", "Tiêu hóa / gan", "#059669"),
+    ("G15", "tea", "Lá Trà", "🍵", "CẦN DS", "Cholesterol / tuân thủ dài hạn", "#3B82F6"),
+]
+for g in plants:
+    R(g[0], "Nhóm cây", f"plant={g[1]}", f"{g[3]} {g[2]} (color: {g[6]})",
+      f"needsPharmacist: {g[4]}", g[5],
+      "onboarding/service.py L14-L29 + plantAssignment.js L3-L19")
+
+R("", "DISEASE→PLANT", "diabetes", "bittermelon (G3)", "", "Mapping sub-condition mãn tính",
+  "onboarding/service.py L73-L78 + plantAssignment.js L22-L28")
+R("", "DISEASE→PLANT", "hypertension", "ginger (G2)", "", "", "")
+R("", "DISEASE→PLANT", "cholesterol", "tea (G15)", "", "", "")
+R("", "DISEASE→PLANT", "bone_joint", "eucommia (G13)", "", "", "")
+R("", "DISEASE→PLANT", "digestive", "phyllanthus (G14)", "", "", "")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 06 APPROVE TREE
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("06. CÂY QUYẾT ĐỊNH — AUTO-APPROVE vs DƯỢC SĨ DUYỆT")
+R("1", "Phân luồng duyệt", "plantGroup ∈ MEDICAL_GROUPS (dynamic từ needsPharmacist=true)",
+  "needsPharmacist=TRUE → plantStatus='pending', habits=[], vào pharmacistQueue",
+  "MEDICAL_GROUPS = {G2,G3,G7,G8,G13,G14,G15} (derived from needsPharmacist flag)",
+  "Chờ DS duyệt mới sinh habit",
+  "onboarding/service.py L114-L118, L220-L227")
+R("2", "Phân luồng duyệt", "plantGroup ∉ MEDICAL_GROUPS",
+  "Auto-approve → plantStatus='growing', AI sinh habit ngay",
+  "AUTO_APPROVE_GROUPS = {G1,G4,G5,G6,G9,G10,G11,G12} (hardcode careplan/service.py)",
+  "Không cần DS",
+  "onboarding/service.py L225-L227 + careplan/service.py L10")
+R("3", "Hàng đợi DS", "needsPharmacist=true (từ bước onboarding)",
+  "pharmacistQueue/draft-{uid}: status=pending, priority=medium",
+  "Kèm aiSummary, healthStatus, subs, plantGroup, plantType, plantLabel",
+  "",
+  "onboarding/service.py L368-L380")
+R("4", "DS Duyệt", "POST /api/pharmacist/approve/{draftId}",
+  "queue→approved; plan-1: plantStatus='growing', pharmacistApproved=true, sinh habit",
+  "habitSource='pharmacist_approved'",
+  "Push PHARMACIST_APPROVED + insight. Audit care_plan_approved",
+  "pharmacist/service.py L101-L191")
+R("5", "DS Từ chối", "POST /api/pharmacist/reject/{draftId}",
+  "queue→rejected; plan-1: plantStatus='paused', pharmacistApproved=false, needsPharmacist=false",
+  "Kèm rejectReason",
+  "Push 'Hồ sơ cần bổ sung' + insight. Audit care_plan_rejected",
+  "pharmacist/service.py L194-L256")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 07 CARE PLAN / HABITS
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("07. CARE PLAN & SINH HABIT (AI)")
+R("1", "Sinh habit", "CarePlanService.generate_habits(userId, plantGroup, profile)",
+  "Render prompt careplan_habits → AI → validate guardrails → parse JSON",
+  "Base = get_all_habits(group) từ habitCatalog (Firestore, cache 5 phút TTL)",
+  "AI fail/unsafe → fallback catalog base_habits",
+  "careplan/service.py L36-L103")
+R("2", "Giới hạn active", "AI trả habits",
+  "Tối đa 3 habit active cùng lúc",
+  "active_count < 3 → active=True; else → active=False",
+  "Đếm loop tuần tự",
+  "careplan/service.py L88-L96")
+R("3", "Catalog", "Đọc habit từ Firestore",
+  "habitCatalog collection (cache 5 phút TTL), fallback FALLBACK_CATALOG hardcode",
+  "default=active, optional=inactive",
+  "Fallback chỉ có G1 và G2 hardcode",
+  "careplan/habit_catalog.py L15-L41, L111-L136")
+R("4", "KH tự sửa", "PATCH /api/careplan/{plan}/habits/{id}",
+  "Patch fields vào habit object (toggle active/done...)",
+  "",
+  "Self-customize bởi user",
+  "careplan/service.py L106-L125")
+R("5", "KH thêm habit", "POST /api/careplan/{plan}/habits",
+  "custom_{uuid[:8]}, points=10, isCustom=true, active=true, done=false",
+  "icon='ui_note_pencil'",
+  "Audit custom_habit_added",
+  "careplan/service.py L128-L160")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 08 GARDEN
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("08. GARDEN — TƯỚI CÂY / STREAK / STAGE")
+R("1", "Tưới cây", "POST /api/garden/water {habitId}",
+  "Tạo adherenceEvent(eventType='water') +10 điểm; mark habit done+doneAt",
+  "pointsEarned=10, Increment(10) cho loyaltySummary",
+  "DEDUP: cùng habitId cùng ngày → 'Already watered today'",
+  "garden/service.py L90-L149")
+R("2", "Daily reset", "GET /api/garden khi habit.done & doneAt[:10] != hôm nay",
+  "Reset done=false, doneAt=null",
+  "So sánh doneAt[:10] != today_str_reset",
+  "Tự reset đầu ngày mới khi gọi GET",
+  "garden/service.py L26-L38")
+R("3", "Tính streak", "Đếm ngày liên tiếp lùi từ hôm nay",
+  "Lùi từ hôm nay (hoặc hôm qua nếu hôm nay chưa tưới) khi còn trong event_dates",
+  "Quét tối đa 30 adherenceEvents gần nhất (order DESC)",
+  "",
+  "garden/service.py L45-L69")
+R("4", "Tính Stage cây", "Theo streak",
+  "streak≥30→stage=4; ≥15→3; ≥8→2; else 1",
+  "stageNames: ['Chờ duyệt', 'Mầm non', 'Cây non', 'Trưởng thành', 'Đang nụ', 'Nở hoa']",
+  "6 tên nhưng chỉ 4 stage (1-4)",
+  "garden/service.py L72-L80 + onboarding/service.py L244")
+R("5", "Badge garden", "GET /api/garden/badges theo streak",
+  "≥7 'Mầm Xanh'; ≥14 'Cây Lớn'; ≥30 'Vườn Xanh'",
+  "id: sprout / tree / garden",
+  "Demo badges chỉ 3",
+  "garden/service.py L158-L169")
+R("6", "Simulate streak", "POST /api/garden/simulate-streak",
+  "Điền tối đa 7 ngày thiếu (demo), recalc stage, update plantLevel",
+  "simulated=true trên mỗi event",
+  "Chỉ cho demo. active_plan_ref.update({plantLevel: stage})",
+  "garden/service.py L172-L251")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 09 FAMILY
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("09. FAMILY GARDEN & TƯỚI HỘ")
+R("1", "Tạo/ensure family", "_ensure_family(db, user_id)",
+  "Nếu chưa có familyId trong profile → tạo families/{id}, members=[uid]",
+  "Profile path: users/{uid}/profile/info",
+  "",
+  "family/service.py L56-L74")
+R("2", "Tạo invite", "POST /api/family/invite",
+  "Token = sha256(familyId-userId-uuid4)[:12], TTL 7 ngày, invite_url",
+  "expiresAt = now + timedelta(days=7)",
+  "⚠ plan_v3 ghi 72h, code = 7 ngày",
+  "family/service.py L126-L146")
+R("3", "Join family", "POST /api/family/join {token}",
+  "Validate: tồn tại / chưa used / chưa hết hạn / chưa là member / <6 người",
+  "Max 6 thành viên",
+  "Mark invite used=True, usedBy=user_id. Already member → success+alreadyMember=True",
+  "family/service.py L149-L199")
+R("4", "Tưới hộ", "POST /api/family/water/{memberId}",
+  "Sender tưới cây target: +5đ sender (set merge), push WATER_REMINDER cho target",
+  "+5 điểm cho người tưới (set merge, KHÔNG dùng Increment)",
+  "DEDUP 1 lần/ngày/cặp (sender_target), first-write-wins",
+  "family/service.py L222-L297")
+R("5", "Tưới hộ — dup", "Đã tưới cặp này hôm nay",
+  "'Hôm nay bạn đã tưới hộ thành viên này rồi!'",
+  "water_logs/{date}/logs/{sender_target}",
+  "Check log_ref.get().exists trước khi ghi",
+  "family/service.py L234-L237")
+R("6", "Family info", "GET /api/family",
+  "Members + garden data (plant, streak, level, status) cho mỗi member",
+  "Fallback tên từ root user doc nếu profile ko có fullName",
+  "Mỗi member có isMe flag",
+  "family/service.py L79-L123")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 10 NOTIFICATION
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("10. NOTIFICATION & RATE LIMIT")
+R("1", "Rate limit", "send_push_notification",
+  "Max 3 push/ngày/user (push_count/{date})",
+  "MAX_PUSH_PER_DAY = 3",
+  "Vượt → skip (trừ skip_rate_limit=True)",
+  "notification/service.py L29, L60-L67")
+R("2", "No token", "User chưa có fcmToken",
+  "Lưu pending_notifications subcollection, gửi khi đăng ký token (chưa implement drain)",
+  "",
+  "Fallback in-app (pending stored)",
+  "notification/service.py L97-L103")
+R("3", "Audit", "Mỗi lần gửi",
+  "medical_audit_log: action='push_notification_sent' (success/fail, title, body)",
+  "",
+  "Immutable record (Guardrail #5)",
+  "notification/service.py L120-L127")
+R("4", "Template WATER_REMINDER", "Tưới hộ",
+  "'💧 {sender} đã tưới cây {plant} cho bạn' / 'Nhớ {habit} hôm nay nhé!'",
+  "data.screen='home', action='water_reminder'",
+  "Rule #0: không từ y khoa cấm",
+  "notification/service.py L7-L10, L131-L141")
+R("5", "Template HABIT_STREAK", "Streak",
+  "'🔥 Bạn đang có chuỗi {streak} ngày!' / 'Hoàn thành thói quen hôm nay để giữ streak nhé!'",
+  "", "", "notification/service.py L11-L13")
+R("6", "Template REFILL_ALERT", "Sắp hết thuốc",
+  "'💊 {med} sắp hết' / 'Còn ~5 ngày. Đặt trước để không bị gián đoạn nhé!'",
+  "Tránh từ 'điều trị'",
+  "", "notification/service.py L15-L17")
+R("7", "Template PHARMACIST_APPROVED", "DS duyệt",
+  "'✅ Dược sĩ đã duyệt kế hoạch sức khoẻ' / 'Cây {plant} đã sẵn sàng...'",
+  "", "", "notification/service.py L19-L21")
+R("8", "Template FAMILY_MILESTONE", "Cả nhà xong",
+  "'🎉 Gia đình đạt chuỗi 7 ngày cùng nhau!' / 'Nhận badge gia đình đặc biệt ngay!'",
+  "skip_rate_limit=True",
+  "data.screen='tab-family'",
+  "notification/service.py L23-L26, L144-L155")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 11 VOUCHER
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("11. VOUCHER & LOYALTY — GUARDRAIL #4")
+R("1", "Whitelist", "redeem_voucher check",
+  "voucher_id PHẢI ∈ VOUCHER_WHITELIST, nếu không → từ chối",
+  '{"lab","vacc","supp","bandages","saline","glucometer","bp_monitor","glucerna_milk","probiotic"}',
+  "GUARDRAIL #4: TUYỆT ĐỐI không thuốc kê đơn (Rx)",
+  "voucher/service.py L7-L10")
+R("2", "Đủ điểm", "current_points ≥ cost",
+  "Trừ điểm, append voucherHistory, audit voucher_redeemed",
+  "cost lấy từ ALL_VOUCHERS + PLANT_VOUCHER_MAP merged",
+  "Thiếu → 'Không đủ điểm (cần {cost}, hiện có {current_points})'",
+  "voucher/service.py L117-L155")
+R("3", "Targeted voucher", "GET /api/voucher/targeted",
+  "Đọc plantType từ carePlans → PLANT_VOUCHER_MAP, else default",
+  "plant_type = plans[0].plantType || 'default'",
+  "⚠ BUG: key 'bitter_melon' (có _) ≠ plantType 'bittermelon' (không _)",
+  "voucher/service.py L89-L114")
+R("", "Map ginger", "plant=ginger",
+  "bp_monitor (400đ, giảm 15%) + lab (500đ, ưu tiên đặt lịch)",
+  "Huyết áp/tim mạch",
+  "", "voucher/service.py L14-L27")
+R("", "Map bitter_melon", "plant=bitter_melon",
+  "glucometer (300đ, giảm 10%) + glucerna_milk (350đ, giảm 8%)",
+  "Tiểu đường",
+  "⚠ KEY MISMATCH: plantType lưu 'bittermelon' → KHÔNG match 'bitter_melon'",
+  "voucher/service.py L28-L41")
+R("", "Map lavender", "plant=lavender",
+  "supp Omega-3 (300đ, giảm 30.000đ)",
+  "Giấc ngủ/căng thẳng",
+  "", "voucher/service.py L42-L49")
+R("", "Map default", "Còn lại / không match",
+  "probiotic (300đ, giảm 20.000đ) + vacc (500đ, giảm 50.000đ)",
+  "",
+  "KH G3 bittermelon rơi vào đây do key mismatch",
+  "voucher/service.py L50-L63")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 12 PHARMACIST SLA
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("12. PHARMACIST DASHBOARD & SLA")
+R("1", "Hàng đợi", "GET /api/pharmacist/queue",
+  "Lọc status=pending, enrich name/age/time-ago từ profile + root user doc",
+  "Time formatting: <1m→Vừa xong, <60m→X phút trước, <24h→X giờ trước, 1d→Hôm qua, else dd/mm",
+  "", "pharmacist/service.py L7-L69")
+R("2", "Chi tiết KH", "GET /api/pharmacist/customer/{uid}",
+  "profile + healthConditions + carePlans + prescriptions + purchases (top 10 DESC)",
+  "",
+  "", "pharmacist/service.py L72-L98")
+R("3", "SLA escalation", "PharmacistService.check_sla_escalation()",
+  "pending ≥4h (medium→high); ≥8h (→critical)",
+  "0-4h normal, 4-8h high, 8h+ critical",
+  "Audit sla_escalation kèm oldPriority, newPriority, hoursPending",
+  "pharmacist/service.py L259-L311")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 13 SCHEDULER
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("13. SCHEDULER / CRON JOBS", "Header X-Scheduler-Token (bypass cho demo)")
+R("1", "Daily reminders", "POST /api/scheduler/daily-reminders (20:00 VN)",
+  "Bỏ qua user đã hoàn thành ≥1 habit hôm nay (adherenceEvents.timestamp ≥ today); còn lại → push nhắc",
+  "Title: '🌿 Tưới cây chưa hôm nay?'",
+  "Rate limit 3/ngày bên trong send_push_notification",
+  "scheduler/router.py L26-L87")
+R("2", "Family milestone", "Trong daily-reminders, nếu user có family",
+  "Nếu CẢ nhà đều có event hôm nay → FAMILY_MILESTONE push (skip_rate_limit=True)",
+  "",
+  "send_family_streak_notification(member_ids)",
+  "scheduler/router.py L52-L74")
+R("3", "Weekly insights", "POST /api/scheduler/weekly-insights",
+  "AI sinh habit_suggestion/user; nếu safe → lưu insight + push 'Báo cáo sức khỏe tuần'",
+  "",
+  "Validate guardrails + log_ai_output",
+  "scheduler/router.py L89-L126")
+R("4", "Refill check", "POST /api/scheduler/refill-check",
+  "days_since ≥ refill_cycle-3 → push nhắc mua thuốc",
+  "refillCycleDays mặc định 30, nhắc trước 3 ngày",
+  "⚠ BUG: Query top-level 'adherenceEvents' + field 'type'/'date' khác schema subcollection",
+  "scheduler/router.py L128-L170")
+R("5", "SLA cron", "POST /api/scheduler/sla-escalation",
+  "Gọi PharmacistService.check_sla_escalation()",
+  "", "", "scheduler/router.py L172-L176")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 14 GUARDRAILS
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("14. AI GUARDRAILS (RULE #0) — 3 LỚP")
+R("1", "Lớp 1 — Banned patterns (regex)", "validate_ai_response(text)",
+  "8 nhóm regex chặn: suy bệnh từ thuốc, chẩn đoán trực tiếp, kê đơn, đề xuất thuốc, 'bệnh nhân', 'phác đồ điều trị', đề xuất cây thảo dược, suy luận di truyền",
+  "re.IGNORECASE",
+  "Match → violation BANNED_PATTERN",
+  "ai/guardrails.py L6-L28")
+R("2", "Lớp 2 — Disclaimer bắt buộc", "REQUIRED_DISCLAIMERS",
+  "Output PHẢI nhắc 'dược sĩ/DS/bác sĩ' + 'sẽ/quyết định/xem xét/tư vấn/xác nhận'",
+  "1 regex pattern",
+  "Thiếu → violation MISSING_DISCLAIMER",
+  "ai/guardrails.py L31-L33")
+R("3", "Banned exact phrases", "Cụm cấm đứng một mình (case-insensitive)",
+  "'điều trị bệnh', 'mắc bệnh', 'bị bệnh', 'kết luận bệnh'",
+  "4 cụm cấm, check text.lower()",
+  "Match → violation BANNED_PHRASE",
+  "ai/guardrails.py L36-L41")
+R("4", "Lớp 3 — Audit log", "log_ai_output(userId, template, output, isSafe, violations)",
+  "Ghi medical_audit_log: action='ai_generation' (isSafe, violations, outputText, promptTemplate)",
+  "",
+  "Immutable, truy vết",
+  "ai/guardrails.py L70-L85")
+R("5", "AI Client config", "ai_client.chat(prompt, temperature=0.3)",
+  "DeepSeek primary (timeout=3.0s, max_tokens=800, temp=0.3) → Gemini fallback (gemini-1.5-flash, max_output_tokens=800)",
+  "model: 'deepseek-chat' (primary), 'gemini-1.5-flash' (fallback)",
+  "Cả 2 fail → exception → dùng fallback catalog/text",
+  "ai/client.py L8-L62")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 15 HEALTH
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("15. HEALTH TRACKING (GOOGLE FIT)")
+R("1", "OAuth", "GET /api/fitness/auth-url",
+  "Redirect Google OAuth, scope CHỈ đọc (6 scopes), access_type=offline, prompt=consent",
+  "scopes: activity.read, heart_rate.read, body.read, sleep.read, blood_pressure.read, blood_glucose.read",
+  "state=user_id",
+  "fitness/service.py L14-L42")
+R("2", "Callback", "GET /api/fitness/callback",
+  "Đổi code → tokens (httpx AsyncClient), lưu Firestore, sync lần đầu, redirect frontend",
+  "users/{uid}/integrations/google_fit",
+  "Lỗi → fitness_status=error",
+  "fitness/router.py + fitness/service.py L45-L93")
+R("3", "Token refresh", "get_valid_access_token(user_id)",
+  "Còn >5 phút → dùng; hết hạn → refresh bằng refresh_token",
+  "timedelta(minutes=5) buffer",
+  "Không refresh_token → None",
+  "fitness/service.py L114-L141")
+R("4", "Sync data", "POST /api/fitness/sync → fetch_fitness_data",
+  "Lấy 7 ngày: steps, heart_rate, weight, sleep → lưu health_metrics/{date} (raw)",
+  "Sleep qua Sessions API (activityType=72), bucketByTime=86400000ms (1 ngày)",
+  "Rule #0: KHÔNG suy ra bệnh từ chỉ số. Lưu dưới dạng raw data only",
+  "fitness/service.py L144-L209")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 16 OCR
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("16. OCR / UPLOAD")
+R("1", "OCR", "POST /api/ai/ocr-extract (hoặc /api/upload)",
+  "Google Cloud Vision document_text_detection → raw_text + confidence",
+  "ImageAnnotatorClient (ADC auth)",
+  "Audit ocr_processed",
+  "upload/service.py L25-L81")
+R("2", "Trích xuất", "process_document(file_bytes, filename, doc_type, user_id)",
+  "Parse: medications (tên+hàm lượng, max 5), metrics (HbA1c,HA_tam_thu,HA_tam_truong,glucose,cholesterol), tên BN/BS, ngày",
+  "Regex pattern cho mỗi field",
+  "Tối đa 5 thuốc (matches[:5])",
+  "upload/service.py L51-L56, L86-L113")
+R("3", "DocType enum", "Giá trị DocType trong code THỰC TẾ",
+  "prescription / lab_result / medical_book / ultrasound / vaccination",
+  "Đơn thuốc / Xét nghiệm / Sổ khám / Siêu âm / Tiêm chủng",
+  "⚠ Script gốc ghi rx/lab/book/echo/vacc — đó là key onboarding, KHÔNG phải DocType enum",
+  "upload/models.py L7-L12")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 17 ADHERENCE
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("17. ADHERENCE CROSS-CHECK")
+R("1", "So khớp", "AdherenceCrossCheck.validate_user(user_id)",
+  "So adherence meds vs purchase meds (90 ngày adherence, 30 purchases)",
+  "adherence_meds = set từ evt.medicationName; purchase_meds = set từ p.items[].name",
+  "⚠ Query top-level 'adherenceEvents' + 'purchases' — khác schema subcollection garden",
+  "adherence/cross_check.py L9-L91")
+R("2", "Flag medium", "adherence_only (adherence_meds - purchase_meds)",
+  "Khai uống thuốc nhưng KHÔNG có trong lịch sử mua",
+  "severity='medium', type='adherence_without_purchase'",
+  "Audit adherence_cross_check nếu có flag",
+  "adherence/cross_check.py L58-L64")
+R("3", "Flag low", "purchase_only (purchase_meds - adherence_meds)",
+  "Mua thuốc nhưng KHÔNG ghi nhận uống",
+  "severity='low', type='purchase_without_adherence'",
+  "",
+  "adherence/cross_check.py L66-L72")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 18 ACHIEVEMENTS
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("18. ACHIEVEMENTS / BADGES (8 huy hiệu — chỉ hành vi, Rule #0)")
+ach = [
+    ("first_water", "Mầm Xanh Đầu Tiên 🌱", "streak ≥ 1", "['#22C55E','#16A34A']"),
+    ("streak_7", "Tuần Lễ Vàng 🔥", "streak ≥ 7", "['#F59E0B','#D97706']"),
+    ("streak_30", "Tháng Thói Quen 🏆", "streak ≥ 30", "['#8B5CF6','#7C3AED']"),
+    ("level_up", "Cây Lớn Mạnh 🌿", "plantLevel ≥ 2", "['#10B981','#059669']"),
+    ("family_joined", "Vườn Nhà Đầy Đủ 🏡", "≥1 thành viên (không phải mình) đã join (filter !isMe && state!='PENDING')", "['#3B82F6','#2563EB']"),
+    ("water_for_family", "Người Thân Chu Đáo 💧", "wateredForOthers ≥ 1", "['#06B6D4','#0891B2']"),
+    ("voucher_redeemed", "Thu Hoạch Đầu Mùa 🎁", "vouchersRedeemed ≥ 1", "['#EC4899','#DB2777']"),
+    ("points_100", "Tích Lũy 100 Điểm ⭐", "points ≥ 100", "['#EAB308','#CA8A04']"),
+]
+for i, a in enumerate(ach):
+    R(str(i + 1), "Badge", a[2], a[1],
+      f"id={a[0]}, gradient={a[3]}",
+      "Trigger thuần hành vi, không y khoa. checkNewAchievements(state, alreadyUnlocked)",
+      "config/achievements.js L4-L68")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 19 BUSINESS
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("19. BUSINESS MODEL / LTV / MOAT (plan_v3 §7)")
+R("1", "LTV", "Công thức",
+  "400.000đ × 1 lần/tháng × 30% margin × 12 tháng = 1.440.000đ (trần)",
+  "", "", "plan_v3.md")
+R("2", "Phòng thủ 1", "Churn prediction",
+  "Behavioral data → churn prediction → re-engage trước khi mất user",
+  "", "", "plan_v3.md")
+R("3", "Phòng thủ 2", "Retained revenue",
+  "Khóa dòng tiền vào Long Châu, ngăn chảy sang đối thủ",
+  "", "", "plan_v3.md")
+R("4", "Phòng thủ 3", "CAC/LTV",
+  "LTV/CAC > 3 → CAC < 400k. Family viral: 1 user mời 2.3 thành viên",
+  "", "", "plan_v3.md")
+R("5", "Switching cost", "Công thức",
+  "Thói quen (streak) + Lịch sử sức khỏe + Quan hệ gia đình + Điểm tích lũy",
+  "", "", "plan_v3.md")
+R("6", "Retention loop", "Vòng lặp",
+  "Habit Done → Cây lớn → Level Up → Voucher → Mua thuốc → Refill Alert → (Family Reminder/Push) → Habit Done",
+  "", "", "plan_v3.md")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 20 EDGE CASES
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("20. EDGE CASES & ERROR HANDLING (plan_v3 §2.3-2.4 + kiểm chứng code)")
+edge = [
+    ("B đã làm habit trước khi A tưới", "'Bố/mẹ đã hoàn thành rồi!' — không gửi push (plan_v3)", "Chưa implement check trong water_for_member"),
+    ("A tưới nhiều lần/ngày 1 người", "Giới hạn 1 lần/ngày/thành viên", "Dedup water_logs/{date}/logs/{sender_target} — family/service.py L234-L237"),
+    ("B tắt push", "Lưu pending_notifications + badge đỏ (plan)", "pending_notifications stored — notification/service.py L99-L102"),
+    ("2 người cùng tưới B", "Race → 1 push (first-write-wins Firestore)", "log_ref.get().exists check — family/service.py L236"),
+    ("Trẻ <10 trong family", "Plant do bố/mẹ quản, không push cho trẻ (plan)", "Chưa implement trong code"),
+    ("Thành viên rời nhóm", "Cây biến mất, điểm giữ nguyên (plan)", "Chưa implement leave_family"),
+    ("Family > 6 người", "Chặn join (max 6) / scroll horizontal", "len(members) >= 6 → reject — family/service.py L185-L186"),
+    ("FCM token expired", "Re-register khi mở app", "requestNotificationPermission + registerFCMToken — AppContext.jsx L508-L537"),
+    ("FCM send fail", "Retry 3 lần backoff (plan), fallback in-app bell", "Code: no retry, chỉ print error — notification/service.py L116-L117"),
+    ("Invite hết hạn", "'Link mời đã hết hạn.'", "datetime.now(timezone.utc) > expires_at — family/service.py L167-L168"),
+    ("Backend timeout", "Frontend optimistic 'Đã gửi ✓', retry async (plan)", "waterHabit optimistic update + rollback on error — AppContext.jsx L93-L120"),
+    ("Glucose >250 / <70", "Flag DS ngay (KHÔNG tự chẩn đoán) (plan)", "Chưa implement — chỉ lưu raw health_metrics"),
+    ("BP >180/110 / <90/60", "Flag DS chuyên trách (plan)", "Chưa implement — chỉ lưu raw"),
+    ("Thai <12 hoặc >36 tuần", "KHÔNG nhắc bài tập nặng (plan)", "Chưa implement"),
+]
+for i, e in enumerate(edge):
+    R(str(i + 1), "Edge case", e[0], e[1], "", e[2], "plan_v3.md + source code")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 21 DATA MODEL
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("21. FIRESTORE DATA MODEL (kiểm chứng từ code)")
+dm = [
+    ("users/{uid}", "Root user (uid, phone, fullName, role, fcmToken, fcmTokenUpdatedAt, createdAt, updatedAt)"),
+    ("users/{uid}/profile/info", "Hồ sơ (gender, yearOfBirth, healthStatus, familyId, careFor, exercise, chronicSubConditions, badHabits, lifeChanges, createdAt)"),
+    ("users/{uid}/carePlans/plan-1", "Care plan (plantType, plantStatus, plantGroup, plantLabel, plantEmoji, plantLevel, habits[], pharmacistApproved, needsPharmacist, habitSource, aiSummary, stageNames[], journeyType, journeyLabel, conditionSource, conditionVerifiedBy, createdAt, approvedAt, rejectedAt, rejectReason, pharmacistNote)"),
+    ("users/{uid}/adherenceEvents/{auto}", "Sự kiện tưới (eventType='water', habitId, pointsEarned=10, timestamp, simulated?)"),
+    ("users/{uid}/loyaltySummary/info", "Điểm (totalPoints, familyPoints, tier, voucherHistory[{id,redeemedAt}])"),
+    ("users/{uid}/healthConditions/cond-{i}", "Tình trạng (condition='chronic', subCondition, source='self_report', createdAt)"),
+    ("users/{uid}/health_metrics/{date}", "Dữ liệu Google Fit (date, source='google_fit', raw:{steps_7d,heart_rate_7d,weight_latest,sleep_7d}, synced_at)"),
+    ("users/{uid}/integrations/google_fit", "OAuth tokens (connected, access_token, refresh_token, token_expiry, scopes[], connected_at, last_synced_at)"),
+    ("users/{uid}/push_count/{date}", "Đếm push trong ngày (count, date) — rate limit"),
+    ("users/{uid}/pending_notifications/{auto}", "Push chờ gửi khi chưa có token (title, body, data, createdAt)"),
+    ("users/{uid}/prescriptions/{auto}", "Đơn thuốc (đọc bởi pharmacist, chưa rõ schema ghi)"),
+    ("users/{uid}/purchases/{auto}", "Lịch sử mua (date, items[], đọc bởi pharmacist, order DESC)"),
+    ("users/{uid}/familyMembers/{id}", "Legacy family members (từ onboarding, ít dùng)"),
+    ("families/{auto}", "Gia đình (name='Gia đình', members[], totalPoints, createdAt)"),
+    ("invites/{token}", "Invite (familyId, createdBy, expiresAt, used, usedBy)"),
+    ("water_logs/{date}/logs/{sender_target}", "Dedup tưới hộ (senderId, targetId, senderName, plantName, timestamp)"),
+    ("pharmacistQueue/draft-{uid}", "Hàng đợi DS (userId, status, priority, plantGroup, plantType, plantLabel, healthStatus, chronicSubConditions, aiSummary, submittedAt, reviewedBy, reviewedAt, pharmacistNote, rejectReason, escalatedAt, escalationReason)"),
+    ("insights/{auto}", "Thông báo/insight gửi KH (userId, type, title, body, read, generatedAt, plantType?, plantLabel?, reason?)"),
+    ("medical_audit_log/{auto}", "Log bất biến (action, userId, timestamp, + context fields tùy action)"),
+    ("plantGroups/{Gx}", "15 nhóm cây Firestore-backed (plant, label, emoji, needsPharmacist)"),
+    ("diseaseToPlant/{cond}", "Mapping bệnh → cây (plantType)"),
+    ("habitCatalog/{Gx}", "Catalog thói quen theo nhóm (groupId, label, habits[])"),
+]
+for d in dm:
+    R("", "Collection/Document", d[0], d[1], "", "", "Firestore")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 22 API MAP
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("22. API ENDPOINTS MAP (kiểm chứng từ main.py)")
+api = [
+    ("/api/auth/login", "POST", "Đăng nhập phone → custom token", "auth"),
+    ("/api/onboarding/submit", "POST", "Gán cây + tạo care plan", "onboarding"),
+    ("/api/garden/", "GET", "Tóm tắt vườn (plant, points, streak, habits, stage)", "garden"),
+    ("/api/garden/water", "POST", "Tưới cây +10đ (habitId)", "garden"),
+    ("/api/garden/simulate-streak", "POST", "Demo tăng streak (fill 7 ngày)", "garden"),
+    ("/api/garden/badges", "GET", "Badges theo streak", "garden"),
+    ("/api/garden/streak", "GET", "Raw adherenceEvents list", "garden"),
+    ("/api/family/", "GET", "Thông tin gia đình + members garden data", "family"),
+    ("/api/family/invite", "POST", "Tạo link mời (7 ngày TTL)", "family"),
+    ("/api/family/join", "POST", "Tham gia bằng token", "family"),
+    ("/api/family/water/{memberId}", "POST", "Tưới hộ +5đ", "family"),
+    ("/api/family/calendar", "GET", "Family calendar events", "calendar"),
+    ("/api/careplan/", "GET", "Tất cả care plans", "careplan"),
+    ("/api/careplan/", "POST", "Tạo care plan mới", "careplan"),
+    ("/api/careplan/{planId}", "PATCH", "Update care plan fields", "careplan"),
+    ("/api/careplan/{planId}/habits/{habitId}", "PATCH", "Toggle habit (active/done)", "careplan"),
+    ("/api/careplan/{planId}/habits", "POST", "Thêm custom habit", "careplan"),
+    ("/api/voucher/", "GET", "Tất cả voucher (ALL_VOUCHERS)", "voucher"),
+    ("/api/voucher/targeted", "GET", "Voucher theo cây (PLANT_VOUCHER_MAP)", "voucher"),
+    ("/api/voucher/redeem/{voucherId}", "POST", "Đổi voucher (whitelist check)", "voucher"),
+    ("/api/pharmacist/queue", "GET", "Hàng đợi DS (pending)", "pharmacist"),
+    ("/api/pharmacist/customer/{uid}", "GET", "Chi tiết KH cho DS", "pharmacist"),
+    ("/api/pharmacist/approve/{draftId}", "POST", "DS duyệt care plan", "pharmacist"),
+    ("/api/pharmacist/reject/{draftId}", "POST", "DS từ chối care plan", "pharmacist"),
+    ("/api/notification/", "GET", "Danh sách insight/notification", "notification"),
+    ("/api/notification/register-token", "POST", "Đăng ký FCM token", "notification"),
+    ("/api/notification/{id}/read", "PATCH", "Đánh dấu đã đọc", "notification"),
+    ("/api/fitness/auth-url", "GET", "OAuth URL Google Fit", "fitness"),
+    ("/api/fitness/callback", "GET", "OAuth callback", "fitness"),
+    ("/api/fitness/sync", "POST", "Đồng bộ dữ liệu sức khỏe", "fitness"),
+    ("/api/ai/ocr-extract", "POST", "OCR đơn thuốc/giấy tờ", "ai"),
+    ("/api/ai/summary", "POST", "AI summary", "ai"),
+    ("/api/scheduler/daily-reminders", "POST", "Cron nhắc 20:00", "scheduler"),
+    ("/api/scheduler/weekly-insights", "POST", "AI insights hàng tuần", "scheduler"),
+    ("/api/scheduler/refill-check", "POST", "Nhắc refill thuốc", "scheduler"),
+    ("/api/scheduler/sla-escalation", "POST", "SLA escalation check", "scheduler"),
+    ("/api/purchase/", "GET/POST", "Lịch sử mua thuốc", "purchase"),
+    ("/api/upload/", "POST", "Upload file", "upload"),
+    ("/api/calendar/", "GET", "Calendar events", "calendar"),
+    ("/api/health", "GET", "Health check endpoint", "main.py"),
+]
+for a in api:
+    R("", a[1], a[0], a[2], "", f"Router: {a[3]}",
+      "main.py L32-L45")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 23 DEMO FLOW
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("23. DEMO FLOW — 5 BƯỚC WOW (demo_presentation_playbook.md)")
+R("1", "Onboarding AI", "Nhập hồ sơ + quét đơn",
+  "AI tạo Health ID → gợi ý cây Gừng → GerminationScreen nảy mầm + confetti",
+  "1.5 phút",
+  "Wow: hạt giống lớn qua 5 giai đoạn animation",
+  "demo_playbook")
+R("2", "Daily Loop", "Tick habit cuối ngày",
+  "Mascot ăn mừng + confetti + toast '100% hôm nay'",
+  "1.5 phút",
+  "waterHabit → optimistic update → backend sync",
+  "demo_playbook")
+R("3", "Family — Tưới hộ", "Bấm cây Bố (xám)",
+  "Push 'Con đã tưới cây Gừng cho bạn' → cây xanh + '+5 điểm gia đình'",
+  "1.5 phút",
+  "Social moat: family engagement",
+  "demo_playbook")
+R("4", "Health device", "Tab Trái tim",
+  "4 chỉ số từ Apple Watch/Google Fit + Wellness Insight Card",
+  "1 phút",
+  "Rule #0 compliant: chỉ hiển thị data, không chẩn đoán",
+  "demo_playbook")
+R("5", "Pharmacist HITL", "Dashboard DS",
+  "Danh sách chờ → xem tương tác thuốc → Approve",
+  "1.5 phút",
+  "AI phụ, DS chính + SLA đếm ngược",
+  "demo_playbook")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 24 BUGS
+# ═══════════════════════════════════════════════════════════════════════════
+SECTION("24. BUG / INCONSISTENCY PHÁT HIỆN (KIỂM CHỨNG TỪ SOURCE CODE)")
+R("1", "Plant assign order: Backend vs Frontend",
+  "Backend: tuổi (age<18, ≥60) TRƯỚC pregnant; Frontend: pregnant TRƯỚC tuổi",
+  "KH mang thai <18 hoặc ≥60: backend → basil/aloe, frontend → lotus. Cần thống nhất.",
+  "Backend: onboarding/service.py L146-L151; Frontend: plantAssignment.js L67-L69",
+  "Frontend có thêm nhánh 'chronic without subs' → G3 mà backend không có",
+  "CRITICAL — kết quả khác nhau cho cùng input")
+R("2", "Voucher key mismatch: bitter_melon vs bittermelon",
+  "PLANT_VOUCHER_MAP key = 'bitter_melon' (có _) nhưng plantType lưu = 'bittermelon' (không _)",
+  "KH tiểu đường (G3) KHÔNG nhận targeted voucher → rơi về default (probiotic+vacc)",
+  "voucher/service.py L28 key='bitter_melon' vs onboarding/service.py L17 plant='bittermelon'",
+  "Fix: đổi key thành 'bittermelon' trong PLANT_VOUCHER_MAP",
+  "MEDIUM — mất personalization cho KH G3")
+R("3", "Invite TTL: plan_v3 vs code",
+  "Doc ghi 72h, code set timedelta(days=7) = 168h",
+  "Tài liệu lệch code",
+  "family/service.py L135",
+  "Fix: align doc hoặc code",
+  "LOW — feature vẫn hoạt động")
+R("4", "AUTO_APPROVE_GROUPS: unused constant",
+  "careplan/service.py L10: AUTO_APPROVE_GROUPS khai báo nhưng luồng thực dùng _get_medical_groups() (phần bù)",
+  "Dư thừa — không ảnh hưởng logic",
+  "careplan/service.py L10",
+  "Cleanup: xóa hoặc dùng để validate",
+  "LOW — dead code")
+R("5", "Scheduler refill-check: wrong collection path + fields",
+  "Query top-level db.collection('adherenceEvents') + field 'type'/'date' — nhưng schema thực tế là subcollection users/{uid}/adherenceEvents + field 'eventType'/'timestamp'",
+  "Refill check có thể không trả kết quả → bỏ lỡ nhắc refill",
+  "scheduler/router.py L141-L147 vs garden/service.py L106-L112",
+  "Fix: query subcollection users/{uid}/adherenceEvents, đổi field name",
+  "HIGH — feature silent fail")
+R("6", "Adherence cross-check: wrong collection path",
+  "Query top-level db.collection('adherenceEvents') + db.collection('purchases') — nhưng garden dùng subcollection",
+  "Cross-check có thể không tìm thấy data → luôn return isConsistent=True",
+  "adherence/cross_check.py L20-L37",
+  "Fix: query subcollection hoặc tạo top-level index",
+  "HIGH — feature silent fail")
+R("7", "Family water points: set merge vs Increment",
+  "garden/service.py dùng Increment(10) cho water; family/service.py dùng set(merge=True) với totalPoints: current+5",
+  "Race condition: 2 người tưới đồng thời → mất điểm (set overwrites)",
+  "family/service.py L277 vs garden/service.py L119",
+  "Fix: dùng Increment(5) thay vì manual read+write",
+  "MEDIUM — data inconsistency under concurrency")
+R("8", "PLANT_STATUS: validation.py có 'graduated' nhưng code chỉ dùng 'pending'/'growing'/'paused'",
+  "PLANT_STATUS = {'pending','growing','paused','graduated'} — 'graduated' chưa bao giờ được set",
+  "Feature planned nhưng chưa implement",
+  "shared/validation.py L11",
+  "",
+  "LOW — future feature")
+R("9", "DocType enum vs onboarding OCR keys",
+  "upload/models.py DocType: 'prescription','lab_result','medical_book','ultrasound','vaccination'",
+  "Nhưng onboarding/service.py L301-L305 dùng key: 'rx','lab','book','echo','vacc'",
+  "Hai hệ thống key — cần mapping layer",
+  "upload/models.py L7-L12 vs onboarding/service.py L301-L305",
+  "LOW — works vì OCR parse raw text không phụ thuộc DocType key")
+R("10", "FCM retry: plan says 3 retries, code has 0",
+  "plan_v3 ghi 'Retry 3 lần backoff' nhưng code chỉ try/except → print error",
+  "FCM fail = push mất, không retry",
+  "notification/service.py L106-L117",
+  "Fix: thêm retry loop với exponential backoff",
+  "MEDIUM — reliability")
+R("11", "Pending notifications drain: not implemented",
+  "Khi user đăng ký FCM token, pending_notifications không được gửi lại",
+  "User miss push khi chưa có token",
+  "notification/service.py L99-L102 (store) vs register_device L50-L57 (no drain)",
+  "Fix: thêm drain logic trong register_device",
+  "MEDIUM — UX gap")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# WRITE CSV
+# ═══════════════════════════════════════════════════════════════════════════
+output_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "lc_care_decision_tree.csv")
+
+with open(output_path, "w", encoding="utf-8-sig", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(HEADER)
+    for r in rows:
+        w.writerow(r)
+
+print(f"✅ CSV written to: {output_path}")
+print(f"   Total rows: {len(rows)} (excluding header)")
+print(f"   Sections: {sum(1 for r in rows if r[1].startswith('████'))}")

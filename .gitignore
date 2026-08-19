@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets (keep *.env.example)
+*.env
+.env.*
+!*.env.example
+deepsek.env
+firebase.env
+
+# Firebase service account keys
+*-firebase-adminsdk-*.json
+firebase-service-account.json*
+firebase_auth_key_credential.json
+
+# AI agent harness (dev-only, không cần trên repo)
+everything-claude-code/
+
+# Skills (dev-only tools)
+ba-bpmn-specialist/
+
+# Confluence files (auto-generated)
+confluence_*.html
+update_confluence*.py
+
+# Python virtual environments
+venv*/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Generated scripts
+remove_bg.sh
+
+# Claude / MCP config (local only, contains API keys)
+.claude/
+.mcp.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build output
+dist/
+
+# Firebase deploy cache
+.firebase/
+
+# Presentation master (nặng, để local, không commit)
+ppt-master/
+
+# Game assets (nặng ~67MB, để local / drive, không commit)
+# Backup: ~/Downloads/lc_care_assets_backup.zip (2026-08-20)
+frontend/public/assets/
+docs/assets/
+Long Chau Care .pptx
+preBodFeedback/Trang chủ.png
+preBodFeedback/LC-Gamification-Vun-cay-vuon-khoe.pptx
+preBodFeedback/*_files/
+
+# Office lock files
+~$*
+
+# External / embedded git repos
+taste-skill/
+claudedesignskills_tmp/
+
+# Env bundle (chứa secrets, không commit)
+lc-care-env-bundle*
+
+
+

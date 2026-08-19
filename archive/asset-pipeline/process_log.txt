@@ -1,0 +1,39 @@
+Scanning 266 PNG files in frontend/public/assets...
+  24 need bg removal  |  217 transparent  |  16 skipped (identity)
+  [  1/24] OK    processed_plants/ginger_1_raw.png  (334KB -> 545KB)
+  [  2/24] OK    processed_plants/ginger_2_raw.png  (345KB -> 378KB)
+  [  3/24] OK    processed_plants/ginger_3_raw.png  (450KB -> 454KB)
+  [  4/24] OK    processed_plants/ginger_4_raw.png  (367KB -> 572KB)
+  [  5/24] OK    processed_plants/ginger_5_raw.png  (546KB -> 911KB)
+  [  6/24] OK    processed_plants/lemongrass_1_raw.png  (402KB -> 335KB)
+  [  7/24] OK    processed_plants/lemongrass_2_raw.png  (252KB -> 313KB)
+  [  8/24] OK    processed_plants/lemongrass_3_raw.png  (336KB -> 502KB)
+  [  9/24] OK    processed_plants/lemongrass_4_raw.png  (649KB -> 1074KB)
+  [ 10/24] OK    processed_plants/lemongrass_5_raw.png  (690KB -> 1154KB)
+  [ 11/24] OK    processed_plants/lotus_1_raw.png  (397KB -> 328KB)
+  [ 12/24] OK    processed_plants/lotus_2_raw.png  (282KB -> 393KB)
+  [ 13/24] OK    processed_plants/lotus_3_raw.png  (364KB -> 646KB)
+  [ 14/24] OK    processed_plants/lotus_4_raw.png  (494KB -> 593KB)
+  [ 15/24] OK    processed_plants/lotus_5_raw.png  (543KB -> 1051KB)
+  [ 16/24] OK    processed_root/plant_bacha.png  (521KB -> 1005KB)
+  [ 17/24] OK    processed_root/plant_camthao.png  (461KB -> 903KB)
+  [ 18/24] OK    processed_root/plant_diephachau.png  (487KB -> 966KB)
+  [ 19/24] OK    processed_root/plant_dotrong.png  (441KB -> 843KB)
+  [ 20/24] OK    processed_root/plant_hungque.png  (393KB -> 742KB)
+  [ 21/24] OK    processed_root/plant_khoqua.png  (427KB -> 802KB)
+  [ 22/24] OK    processed_root/plant_lohoi.png  (414KB -> 744KB)
+  [ 23/24] OK    processed_root/plant_nhansam.png  (373KB -> 705KB)
+  [ 24/24] OK    processed_root/plant_oaihuong.png  (447KB -> 846KB)
+
+Converting 242 images to WebP lossless (method=6)...
+  [100/242] converted
+  [200/242] converted
+  [242/242] converted
+
+============================================================
+DONE
+  Scanned:       266
+  BG removed:    24 OK, 0 warn, 0 fail
+  WebP:          242 OK, 0 fail
+  Manifest:      /Users/dangthiduyen/Downloads/FPT DLC/LC_Care/scripts/manifest.json
+============================================================

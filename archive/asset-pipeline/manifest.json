@@ -1,0 +1,207 @@
+{
+  "images": [
+    {
+      "source": "frontend/public/assets/processed_plants/ginger_1_raw.png",
+      "output": "frontend/public/assets/processed_plants/ginger_1.png",
+      "status": "processed",
+      "src_kb": 334,
+      "dst_kb": 545,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/ginger_2_raw.png",
+      "output": "frontend/public/assets/processed_plants/ginger_2.png",
+      "status": "processed",
+      "src_kb": 345,
+      "dst_kb": 378,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/ginger_3_raw.png",
+      "output": "frontend/public/assets/processed_plants/ginger_3.png",
+      "status": "processed",
+      "src_kb": 450,
+      "dst_kb": 454,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/ginger_4_raw.png",
+      "output": "frontend/public/assets/processed_plants/ginger_4.png",
+      "status": "processed",
+      "src_kb": 367,
+      "dst_kb": 572,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/ginger_5_raw.png",
+      "output": "frontend/public/assets/processed_plants/ginger_5.png",
+      "status": "processed",
+      "src_kb": 546,
+      "dst_kb": 911,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lemongrass_1_raw.png",
+      "output": "frontend/public/assets/processed_plants/lemongrass_1.png",
+      "status": "processed",
+      "src_kb": 402,
+      "dst_kb": 335,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lemongrass_2_raw.png",
+      "output": "frontend/public/assets/processed_plants/lemongrass_2.png",
+      "status": "processed",
+      "src_kb": 252,
+      "dst_kb": 313,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lemongrass_3_raw.png",
+      "output": "frontend/public/assets/processed_plants/lemongrass_3.png",
+      "status": "processed",
+      "src_kb": 336,
+      "dst_kb": 502,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lemongrass_4_raw.png",
+      "output": "frontend/public/assets/processed_plants/lemongrass_4.png",
+      "status": "processed",
+      "src_kb": 649,
+      "dst_kb": 1074,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lemongrass_5_raw.png",
+      "output": "frontend/public/assets/processed_plants/lemongrass_5.png",
+      "status": "processed",
+      "src_kb": 690,
+      "dst_kb": 1154,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lotus_1_raw.png",
+      "output": "frontend/public/assets/processed_plants/lotus_1.png",
+      "status": "processed",
+      "src_kb": 397,
+      "dst_kb": 328,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lotus_2_raw.png",
+      "output": "frontend/public/assets/processed_plants/lotus_2.png",
+      "status": "processed",
+      "src_kb": 282,
+      "dst_kb": 393,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lotus_3_raw.png",
+      "output": "frontend/public/assets/processed_plants/lotus_3.png",
+      "status": "processed",
+      "src_kb": 364,
+      "dst_kb": 646,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lotus_4_raw.png",
+      "output": "frontend/public/assets/processed_plants/lotus_4.png",
+      "status": "processed",
+      "src_kb": 494,
+      "dst_kb": 593,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_plants/lotus_5_raw.png",
+      "output": "frontend/public/assets/processed_plants/lotus_5.png",
+      "status": "processed",
+      "src_kb": 543,
+      "dst_kb": 1051,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_bacha.png",
+      "output": "frontend/public/assets/processed_root/plant_bacha.png",
+      "status": "processed",
+      "src_kb": 521,
+      "dst_kb": 1005,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_camthao.png",
+      "output": "frontend/public/assets/processed_root/plant_camthao.png",
+      "status": "processed",
+      "src_kb": 461,
+      "dst_kb": 903,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_diephachau.png",
+      "output": "frontend/public/assets/processed_root/plant_diephachau.png",
+      "status": "processed",
+      "src_kb": 487,
+      "dst_kb": 966,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_dotrong.png",
+      "output": "frontend/public/assets/processed_root/plant_dotrong.png",
+      "status": "processed",
+      "src_kb": 441,
+      "dst_kb": 843,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_hungque.png",
+      "output": "frontend/public/assets/processed_root/plant_hungque.png",
+      "status": "processed",
+      "src_kb": 393,
+      "dst_kb": 742,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_khoqua.png",
+      "output": "frontend/public/assets/processed_root/plant_khoqua.png",
+      "status": "processed",
+      "src_kb": 427,
+      "dst_kb": 802,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_lohoi.png",
+      "output": "frontend/public/assets/processed_root/plant_lohoi.png",
+      "status": "processed",
+      "src_kb": 414,
+      "dst_kb": 744,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_nhansam.png",
+      "output": "frontend/public/assets/processed_root/plant_nhansam.png",
+      "status": "processed",
+      "src_kb": 373,
+      "dst_kb": 705,
+      "warnings": []
+    },
+    {
+      "source": "frontend/public/assets/processed_root/plant_oaihuong.png",
+      "output": "frontend/public/assets/processed_root/plant_oaihuong.png",
+      "status": "processed",
+      "src_kb": 447,
+      "dst_kb": 846,
+      "warnings": []
+    }
+  ],
+  "summary": {
+    "total_scanned": 266,
+    "needs_bg_removal": 24,
+    "skipped_identity": 16,
+    "already_transparent": 202,
+    "bg_removed_ok": 24,
+    "bg_removed_warn": 0,
+    "bg_removed_fail": 0,
+    "webp_converted": 242,
+    "webp_failed": 0
+  }
+}
